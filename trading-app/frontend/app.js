@@ -235,13 +235,24 @@ async function updateDashboardStats() {
 
 async function loadPositions() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/positions?status=OPEN`);
-        state.positions = await response.json();
+        // Intentar obtener posiciones desde TopstepX primero
+        const response = await fetch(`${API_BASE_URL}/api/positions/topstepx`);
+        const data = await response.json();
+
+        state.positions = data.positions || [];
 
         updatePositionsTable();
 
     } catch (error) {
         console.error('Error cargando posiciones:', error);
+        // Fallback a posiciones de BD
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/positions?status=OPEN`);
+            state.positions = await response.json();
+            updatePositionsTable();
+        } catch (err) {
+            console.error('Error cargando posiciones desde BD:', err);
+        }
     }
 }
 
@@ -259,16 +270,18 @@ function updatePositionsTable() {
     }
 
     tableBody.innerHTML = state.positions.map(pos => {
-        const pnlColor = pos.pnl >= 0 ? 'text-green-500' : 'text-red-500';
-        const pnlSign = pos.pnl >= 0 ? '+' : '';
+        const pnl = pos.pnl || 0;
+        const pnlColor = pnl >= 0 ? 'text-green-500' : 'text-red-500';
+        const pnlSign = pnl >= 0 ? '+' : '';
+        const currentPrice = pos.current_price || pos.entry_price || 0;
 
         return `
             <tr class="border-b border-dark-border/50">
-                <td class="py-4 font-medium">${pos.contract_name}</td>
-                <td class="py-4">${pos.quantity}</td>
-                <td class="py-4">${pos.entry_price.toFixed(2)}</td>
-                <td class="py-4">-</td>
-                <td class="py-4 ${pnlColor} font-semibold">${pnlSign}$${Math.abs(pos.pnl || 0).toFixed(2)}</td>
+                <td class="py-4 font-medium">${pos.contract_name || pos.symbol || 'N/A'}</td>
+                <td class="py-4">${pos.quantity || 0}</td>
+                <td class="py-4">$${(pos.entry_price || 0).toFixed(2)}</td>
+                <td class="py-4">$${currentPrice.toFixed(2)}</td>
+                <td class="py-4 ${pnlColor} font-semibold">${pnlSign}$${Math.abs(pnl).toFixed(2)}</td>
                 <td class="py-4">
                     <button onclick="closePosition('${pos.id}')" class="text-accent-cyan hover:text-cyan-400 font-medium">Close</button>
                 </td>
@@ -519,11 +532,366 @@ async function loadTradingSchedule() {
 }
 
 // ============================================================================
+// FUNCIONES DE AUTENTICACIÓN DE USUARIOS
+// ============================================================================
+
+function switchAuthTab(tab) {
+    const tabs = ['login', 'register', 'forgot-password'];
+    const forms = ['form-login', 'form-register', 'form-forgot-password'];
+
+    tabs.forEach((t, i) => {
+        const tabEl = document.getElementById(`tab-${t}`);
+        const formEl = document.getElementById(forms[i]);
+
+        if (t === tab) {
+            if (tabEl) {
+                tabEl.classList.add('bg-accent-cyan', 'text-white');
+                tabEl.classList.remove('text-gray-400');
+            }
+            if (formEl) formEl.classList.remove('hidden');
+        } else {
+            if (tabEl) {
+                tabEl.classList.remove('bg-accent-cyan', 'text-white');
+                tabEl.classList.add('text-gray-400');
+            }
+            if (formEl) formEl.classList.add('hidden');
+        }
+    });
+}
+
+async function loginUser() {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    const messageEl = document.getElementById('login-message');
+
+    if (!username || !password) {
+        showMessage(messageEl, '❌ Complete todos los campos', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username_or_email: username,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            localStorage.setItem('user_id', data.user_id);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('email', data.email);
+
+            showMessage(messageEl, '✅ Login exitoso', 'success');
+
+            setTimeout(() => {
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                loadUserData();
+                loadInitialData();
+            }, 1000);
+        } else {
+            showMessage(messageEl, `❌ ${data.detail || 'Error en login'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error en login:', error);
+        showMessage(messageEl, '❌ Error de conexión', 'error');
+    }
+}
+
+async function registerUser() {
+    const username = document.getElementById('register-username').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
+    const messageEl = document.getElementById('register-message');
+
+    if (!username || !email || !password || !confirmPassword) {
+        showMessage(messageEl, '❌ Complete todos los campos', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showMessage(messageEl, '❌ Las contraseñas no coinciden', 'error');
+        return;
+    }
+
+    if (password.length < 8) {
+        showMessage(messageEl, '❌ La contraseña debe tener al menos 8 caracteres', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showMessage(messageEl, '✅ Registro exitoso. Código de verificación: ' + (data.verification_code || 'revisar email'), 'success');
+            setTimeout(() => switchAuthTab('login'), 2000);
+        } else {
+            showMessage(messageEl, `❌ ${data.detail || 'Error en registro'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error en registro:', error);
+        showMessage(messageEl, '❌ Error de conexión', 'error');
+    }
+}
+
+function showForgotPassword() {
+    switchAuthTab('forgot-password');
+}
+
+async function sendRecoveryCode() {
+    const email = document.getElementById('forgot-email').value;
+    const messageEl = document.getElementById('forgot-message');
+
+    if (!email) {
+        showMessage(messageEl, '❌ Ingresa tu email', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/forgot-password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: email})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showMessage(messageEl, '✅ Código enviado a tu email', 'success');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showMessage(messageEl, '❌ Error de conexión', 'error');
+    }
+}
+
+// ============================================================================
+// ESTRATEGIAS
+// ============================================================================
+
+state.strategies = [];
+
+async function loadStrategies() {
+    const userId = localStorage.getItem('user_id');
+    if (!userId) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/strategies?user_id=${userId}`);
+        const data = await response.json();
+        state.strategies = data.strategies || [];
+        updateStrategiesSelect();
+    } catch (error) {
+        console.error('Error cargando estrategias:', error);
+    }
+}
+
+function updateStrategiesSelect() {
+    const selects = document.querySelectorAll('select[id*="strategy"]');
+    selects.forEach(select => {
+        select.innerHTML = '<option value="">Seleccionar estrategia...</option>';
+        state.strategies.forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.name;
+            select.appendChild(option);
+        });
+    });
+}
+
+async function saveStrategy(strategyData) {
+    const userId = localStorage.getItem('user_id');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/strategies?user_id=${userId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(strategyData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Estrategia guardada');
+            await loadStrategies();
+        }
+    } catch (error) {
+        console.error('Error guardando estrategia:', error);
+        alert('❌ Error guardando estrategia');
+    }
+}
+
+// ============================================================================
 // CONFIGURACIÓN
 // ============================================================================
 
+async function loadUserData() {
+    const userId = localStorage.getItem('user_id');
+    if (!userId) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/me?user_id=${userId}`);
+        const user = await response.json();
+
+        const userDisplay = document.getElementById('current-user-display');
+        const emailDisplay = document.getElementById('current-email-display');
+
+        if (userDisplay) userDisplay.value = user.username;
+        if (emailDisplay) emailDisplay.value = user.email;
+    } catch (error) {
+        console.error('Error cargando datos de usuario:', error);
+    }
+}
+
+function toggleApiKeyVisibility() {
+    const input = document.getElementById('config-api-key');
+    const icon = document.getElementById('api-key-visibility-icon');
+
+    if (input && icon) {
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.textContent = 'visibility_off';
+        } else {
+            input.type = 'password';
+            icon.textContent = 'visibility';
+        }
+    }
+}
+
+async function testTopstepConnection() {
+    const apiKey = document.getElementById('config-api-key').value;
+    const username = document.getElementById('config-topstep-username').value;
+    const statusDiv = document.getElementById('topstep-connection-status');
+    const messageEl = document.getElementById('topstep-connection-message');
+
+    if (!apiKey || !username) {
+        alert('❌ Ingresa API Key y Username');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({api_key: apiKey, username: username})
+        });
+
+        const data = await response.json();
+
+        if (statusDiv && messageEl) {
+            if (data.success) {
+                statusDiv.classList.remove('hidden', 'bg-red-500/20');
+                statusDiv.classList.add('bg-green-500/20');
+                messageEl.textContent = '✅ Conexión exitosa a TopstepX';
+                messageEl.className = 'text-sm text-green-500';
+            } else {
+                statusDiv.classList.remove('hidden', 'bg-green-500/20');
+                statusDiv.classList.add('bg-red-500/20');
+                messageEl.textContent = '❌ Error en conexión: ' + (data.message || 'Desconocido');
+                messageEl.className = 'text-sm text-red-500';
+            }
+        }
+    } catch (error) {
+        if (statusDiv && messageEl) {
+            statusDiv.classList.remove('hidden', 'bg-green-500/20');
+            statusDiv.classList.add('bg-red-500/20');
+            messageEl.textContent = '❌ Error de conexión';
+            messageEl.className = 'text-sm text-red-500';
+        }
+    }
+}
+
+async function saveTopstepApiKey() {
+    alert('✅ API Key guardada (funcionalidad completa por implementar)');
+}
+
+// ============================================================================
+// GESTIÓN DE CONTRATOS
+// ============================================================================
+
+async function searchContractsInput() {
+    const searchInput = document.querySelector('input[placeholder*="Buscar contratos"]');
+    if (!searchInput) return;
+
+    const symbol = searchInput.value.trim();
+
+    if (!symbol || symbol.length < 2) return;
+
+    try {
+        const contracts = await searchContracts(symbol);
+        updateContractsSearchResults(contracts);
+    } catch (error) {
+        console.error('Error buscando contratos:', error);
+    }
+}
+
+function updateContractsSearchResults(contracts) {
+    console.log('Contratos encontrados:', contracts);
+}
+
+async function addContractToBot(contractId, strategyId = null) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/contracts/${contractId}/add`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({contract_id: contractId, strategy_id: strategyId})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Contrato añadido al bot');
+        }
+    } catch (error) {
+        console.error('Error añadiendo contrato:', error);
+    }
+}
+
+async function removeContract(contractId) {
+    if (!confirm('¿Eliminar este contrato?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/contracts/${contractId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Contrato eliminado');
+        }
+    } catch (error) {
+        console.error('Error eliminando contrato:', error);
+    }
+}
+
+// ============================================================================
+// POSICIONES Y P&L
+// ============================================================================
+
+async function closePosition(positionId) {
+    if (!confirm('¿Cerrar esta posición?')) return;
+
+    alert('⚠️ Funcionalidad de cierre de posiciones por implementar');
+}
+
 function testConnection() {
-    alert('⚠️ Para probar la conexión, use el modal de inicio de sesión principal.');
+    alert('⚠️ Para probar la conexión, use el modal de inicio de sesión principal o la configuración de TopstepX.');
 }
 
 function saveCredentials() {

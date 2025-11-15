@@ -394,4 +394,122 @@ CREATE INDEX IF NOT EXISTS idx_backtest_runs_contract ON backtest_runs (contract
 CREATE INDEX IF NOT EXISTS idx_backtest_runs_created ON backtest_runs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_backtest_runs_completed ON backtest_runs (completed);
 
+-- Tabla de usuarios del sistema
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    verification_code VARCHAR(10),
+    verification_code_expiry TIMESTAMPTZ,
+    reset_code VARCHAR(10),
+    reset_code_expiry TIMESTAMPTZ,
+    topstep_api_key VARCHAR(255), -- Encrypted
+    topstep_username VARCHAR(100),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_login TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users (is_active);
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Tabla de estrategias guardadas
+CREATE TABLE IF NOT EXISTS strategies (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+
+    -- Modelo RL
+    use_model BOOLEAN NOT NULL DEFAULT FALSE,
+    model_path VARCHAR(255),
+
+    -- Indicadores habilitados
+    use_smi BOOLEAN NOT NULL DEFAULT FALSE,
+    use_macd BOOLEAN NOT NULL DEFAULT FALSE,
+    use_bb BOOLEAN NOT NULL DEFAULT FALSE,
+    use_ma BOOLEAN NOT NULL DEFAULT FALSE,
+    use_stoch_rsi BOOLEAN NOT NULL DEFAULT FALSE,
+    use_vwap BOOLEAN NOT NULL DEFAULT FALSE,
+    use_supertrend BOOLEAN NOT NULL DEFAULT FALSE,
+    use_kdj BOOLEAN NOT NULL DEFAULT FALSE,
+    use_cci BOOLEAN NOT NULL DEFAULT FALSE,
+    use_roc BOOLEAN NOT NULL DEFAULT FALSE,
+    use_atr BOOLEAN NOT NULL DEFAULT FALSE,
+    use_wr BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Parámetros SMI
+    smi_k_length INTEGER DEFAULT 8,
+    smi_d_smoothing INTEGER DEFAULT 3,
+    smi_signal_period INTEGER DEFAULT 3,
+
+    -- Parámetros MACD
+    macd_fast_period INTEGER DEFAULT 12,
+    macd_slow_period INTEGER DEFAULT 26,
+    macd_signal_period INTEGER DEFAULT 9,
+
+    -- Parámetros Bollinger Bands
+    bb_period INTEGER DEFAULT 20,
+    bb_std_dev DOUBLE PRECISION DEFAULT 2.0,
+
+    -- Parámetros Moving Averages
+    ma_sma_fast INTEGER DEFAULT 20,
+    ma_sma_slow INTEGER DEFAULT 50,
+    ma_ema_fast INTEGER DEFAULT 12,
+    ma_ema_slow INTEGER DEFAULT 26,
+
+    -- Parámetros StochRSI
+    stoch_rsi_period INTEGER DEFAULT 14,
+    stoch_rsi_stoch_period INTEGER DEFAULT 14,
+    stoch_rsi_k_smooth INTEGER DEFAULT 3,
+    stoch_rsi_d_smooth INTEGER DEFAULT 3,
+
+    -- Parámetros VWAP
+    vwap_std_dev DOUBLE PRECISION DEFAULT 2.0,
+
+    -- Parámetros SuperTrend
+    supertrend_period INTEGER DEFAULT 10,
+    supertrend_multiplier DOUBLE PRECISION DEFAULT 3.0,
+
+    -- Parámetros KDJ
+    kdj_period INTEGER DEFAULT 9,
+    kdj_k_smooth INTEGER DEFAULT 3,
+    kdj_d_smooth INTEGER DEFAULT 3,
+
+    -- Parámetros CCI
+    cci_period INTEGER DEFAULT 20,
+
+    -- Parámetros ROC
+    roc_period INTEGER DEFAULT 12,
+
+    -- Parámetros ATR
+    atr_period INTEGER DEFAULT 14,
+
+    -- Parámetros Williams %R
+    wr_period INTEGER DEFAULT 14,
+
+    -- Configuración de gestión de riesgo
+    stop_loss_usd DOUBLE PRECISION DEFAULT 150.0,
+    take_profit_ratio DOUBLE PRECISION DEFAULT 2.5,
+    timeframe_minutes INTEGER DEFAULT 5,
+    min_confidence DOUBLE PRECISION DEFAULT 0.70,
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_strategies_user ON strategies (user_id);
+CREATE INDEX IF NOT EXISTS idx_strategies_active ON strategies (is_active);
+
+CREATE TRIGGER update_strategies_updated_at BEFORE UPDATE ON strategies
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 COMMIT;

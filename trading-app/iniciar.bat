@@ -6,6 +6,19 @@ echo    INICIANDO SERVICIOS - TRADING PLATFORM AI
 echo ================================================================================
 echo.
 
+:: Verificar si es la primera vez (verificar si existe node_modules o venv)
+if not exist "backend\venv" (
+    echo [PRIMERA VEZ DETECTADA] Instalando dependencias...
+    echo.
+    call instalar.bat
+    if %errorLevel% neq 0 (
+        echo [ERROR] Error instalando dependencias.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
 :: Verificar que Docker esta corriendo
 echo Verificando Docker Desktop...
 docker ps >nul 2>&1
