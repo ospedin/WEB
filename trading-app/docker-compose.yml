@@ -9,7 +9,6 @@ services:
       POSTGRES_DB: trading_db
       POSTGRES_USER: trading_user
       POSTGRES_PASSWORD: trading_pass
-      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=timescaledb"
     ports:
       - "5432:5432"
     volumes:
