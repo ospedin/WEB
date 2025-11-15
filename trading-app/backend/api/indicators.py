@@ -741,3 +741,87 @@ class TechnicalIndicators:
                 'neutral': len(signals) - long_count - short_count
             }
         }
+
+    @staticmethod
+    def calculate_cci(bars: List[HistoricalBar], period: int = 20) -> np.ndarray:
+        """
+        Calcula CCI (Commodity Channel Index)
+        CCI = (Typical Price - SMA(Typical Price)) / (0.015 * Mean Deviation)
+        Valores típicos: +100 sobrecompra, -100 sobreventa
+        """
+        if len(bars) < period:
+            return np.zeros(len(bars))
+
+        # Typical Price = (High + Low + Close) / 3
+        typical_prices = np.array([(bar.high + bar.low + bar.close) / 3.0 for bar in bars])
+
+        cci = np.zeros(len(bars))
+
+        for i in range(period - 1, len(bars)):
+            window = typical_prices[i - period + 1:i + 1]
+            sma = np.mean(window)
+            mean_deviation = np.mean(np.abs(window - sma))
+
+            if mean_deviation > 0:
+                cci[i] = (typical_prices[i] - sma) / (0.015 * mean_deviation)
+            else:
+                cci[i] = 0.0
+
+        # Rellenar valores iniciales
+        cci[:period - 1] = cci[period - 1]
+
+        return cci
+
+    @staticmethod
+    def calculate_roc(bars: List[HistoricalBar], period: int = 12) -> np.ndarray:
+        """
+        Calcula ROC (Rate of Change)
+        ROC = ((Close - Close[n periods ago]) / Close[n periods ago]) * 100
+        Mide el porcentaje de cambio en el precio
+        """
+        if len(bars) < period + 1:
+            return np.zeros(len(bars))
+
+        closes = np.array([bar.close for bar in bars])
+        roc = np.zeros(len(bars))
+
+        for i in range(period, len(bars)):
+            if closes[i - period] != 0:
+                roc[i] = ((closes[i] - closes[i - period]) / closes[i - period]) * 100.0
+            else:
+                roc[i] = 0.0
+
+        # Rellenar valores iniciales
+        roc[:period] = roc[period]
+
+        return roc
+
+    @staticmethod
+    def calculate_williams_r(bars: List[HistoricalBar], period: int = 14) -> np.ndarray:
+        """
+        Calcula Williams %R
+        %R = (Highest High - Close) / (Highest High - Lowest Low) * -100
+        Valores: -20 a 0 = sobrecompra, -100 a -80 = sobreventa
+        """
+        if len(bars) < period:
+            return np.zeros(len(bars))
+
+        highs = np.array([bar.high for bar in bars])
+        lows = np.array([bar.low for bar in bars])
+        closes = np.array([bar.close for bar in bars])
+
+        williams_r = np.zeros(len(bars))
+
+        for i in range(period - 1, len(bars)):
+            highest_high = np.max(highs[i - period + 1:i + 1])
+            lowest_low = np.min(lows[i - period + 1:i + 1])
+
+            if highest_high != lowest_low:
+                williams_r[i] = ((highest_high - closes[i]) / (highest_high - lowest_low)) * -100.0
+            else:
+                williams_r[i] = -50.0  # Valor neutral
+
+        # Rellenar valores iniciales
+        williams_r[:period - 1] = williams_r[period - 1]
+
+        return williams_r

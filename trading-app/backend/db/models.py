@@ -310,3 +310,110 @@ class BacktestRun(Base):
     completed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
+
+class User(Base):
+    """Tabla de usuarios del sistema"""
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verification_code = Column(String(10))
+    verification_code_expiry = Column(DateTime(timezone=True))
+    reset_code = Column(String(10))
+    reset_code_expiry = Column(DateTime(timezone=True))
+    topstep_api_key = Column(String(255))  # Encrypted
+    topstep_username = Column(String(100))
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_login = Column(DateTime(timezone=True))
+
+class Strategy(Base):
+    """Estrategias guardadas con configuraciones de indicadores"""
+    __tablename__ = 'strategies'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+
+    # Modelo RL
+    use_model = Column(Boolean, nullable=False, default=False)
+    model_path = Column(String(255))
+
+    # Indicadores habilitados
+    use_smi = Column(Boolean, nullable=False, default=False)
+    use_macd = Column(Boolean, nullable=False, default=False)
+    use_bb = Column(Boolean, nullable=False, default=False)
+    use_ma = Column(Boolean, nullable=False, default=False)
+    use_stoch_rsi = Column(Boolean, nullable=False, default=False)
+    use_vwap = Column(Boolean, nullable=False, default=False)
+    use_supertrend = Column(Boolean, nullable=False, default=False)
+    use_kdj = Column(Boolean, nullable=False, default=False)
+    use_cci = Column(Boolean, nullable=False, default=False)
+    use_roc = Column(Boolean, nullable=False, default=False)
+    use_atr = Column(Boolean, nullable=False, default=False)
+    use_wr = Column(Boolean, nullable=False, default=False)
+
+    # Parámetros SMI
+    smi_k_length = Column(Integer, default=8)
+    smi_d_smoothing = Column(Integer, default=3)
+    smi_signal_period = Column(Integer, default=3)
+
+    # Parámetros MACD
+    macd_fast_period = Column(Integer, default=12)
+    macd_slow_period = Column(Integer, default=26)
+    macd_signal_period = Column(Integer, default=9)
+
+    # Parámetros Bollinger Bands
+    bb_period = Column(Integer, default=20)
+    bb_std_dev = Column(Float, default=2.0)
+
+    # Parámetros Moving Averages (MA Doble)
+    ma_sma_fast = Column(Integer, default=20)
+    ma_sma_slow = Column(Integer, default=50)
+    ma_ema_fast = Column(Integer, default=12)
+    ma_ema_slow = Column(Integer, default=26)
+
+    # Parámetros StochRSI
+    stoch_rsi_period = Column(Integer, default=14)
+    stoch_rsi_stoch_period = Column(Integer, default=14)
+    stoch_rsi_k_smooth = Column(Integer, default=3)
+    stoch_rsi_d_smooth = Column(Integer, default=3)
+
+    # Parámetros VWAP
+    vwap_std_dev = Column(Float, default=2.0)
+
+    # Parámetros SuperTrend
+    supertrend_period = Column(Integer, default=10)
+    supertrend_multiplier = Column(Float, default=3.0)
+
+    # Parámetros KDJ
+    kdj_period = Column(Integer, default=9)
+    kdj_k_smooth = Column(Integer, default=3)
+    kdj_d_smooth = Column(Integer, default=3)
+
+    # Parámetros CCI
+    cci_period = Column(Integer, default=20)
+
+    # Parámetros ROC
+    roc_period = Column(Integer, default=12)
+
+    # Parámetros ATR
+    atr_period = Column(Integer, default=14)
+
+    # Parámetros Williams %R
+    wr_period = Column(Integer, default=14)
+
+    # Configuración de gestión de riesgo
+    stop_loss_usd = Column(Float, default=150.0)
+    take_profit_ratio = Column(Float, default=2.5)
+    timeframe_minutes = Column(Integer, default=5)
+    min_confidence = Column(Float, default=0.70)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

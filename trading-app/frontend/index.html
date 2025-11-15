@@ -39,23 +39,83 @@
     <div class="bg-dark-card border border-dark-border rounded-2xl p-8 max-w-md w-full mx-4">
         <div class="flex items-center gap-3 mb-6">
             <div class="bg-accent-cyan p-2 rounded-lg">
-                <span class="material-symbols-outlined text-2xl">database</span>
+                <span class="material-symbols-outlined text-2xl">account_circle</span>
             </div>
-            <h2 class="text-2xl font-bold">Conectar a TopstepX</h2>
+            <h2 class="text-2xl font-bold">AI Trading App</h2>
         </div>
-        <div class="space-y-4">
-            <div>
-                <label class="text-gray-300 text-sm font-medium block mb-2">API Key</label>
-                <input id="api-key" type="password" placeholder="Ingresa tu API Key" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
-            </div>
-            <div>
-                <label class="text-gray-300 text-sm font-medium block mb-2">Username</label>
-                <input id="username" type="text" placeholder="Ingresa tu usuario" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
-            </div>
-            <button onclick="login()" class="w-full bg-accent-cyan hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition">
-                Conectar
+
+        <!-- Tabs -->
+        <div class="flex mb-6 bg-dark-bg rounded-lg p-1">
+            <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 px-4 rounded-md bg-accent-cyan text-white font-medium transition">
+                Iniciar Sesión
             </button>
-            <div id="auth-message" class="text-sm text-center hidden"></div>
+            <button id="tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 px-4 rounded-md text-gray-400 font-medium transition hover:text-white">
+                Registrarse
+            </button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="form-login" class="space-y-4">
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Usuario o Email</label>
+                <input id="login-username" type="text" placeholder="Ingresa tu usuario o email" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Contraseña</label>
+                <input id="login-password" type="password" placeholder="Ingresa tu contraseña" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="showForgotPassword()" class="text-sm text-accent-cyan hover:text-cyan-400 transition">
+                    ¿Olvidaste tu contraseña?
+                </button>
+            </div>
+            <button onclick="loginUser()" class="w-full bg-accent-cyan hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                Iniciar Sesión
+            </button>
+            <div id="login-message" class="text-sm text-center hidden"></div>
+        </div>
+
+        <!-- Register Form -->
+        <div id="form-register" class="space-y-4 hidden">
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Nombre de Usuario</label>
+                <input id="register-username" type="text" placeholder="Elige un nombre de usuario" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Email</label>
+                <input id="register-email" type="email" placeholder="tu@email.com" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Contraseña</label>
+                <input id="register-password" type="password" placeholder="Mínimo 8 caracteres" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Confirmar Contraseña</label>
+                <input id="register-confirm-password" type="password" placeholder="Repite tu contraseña" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <button onclick="registerUser()" class="w-full bg-accent-cyan hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                Crear Cuenta
+            </button>
+            <div id="register-message" class="text-sm text-center hidden"></div>
+        </div>
+
+        <!-- Forgot Password Form -->
+        <div id="form-forgot-password" class="space-y-4 hidden">
+            <div class="flex items-center gap-2 mb-4">
+                <button onclick="switchAuthTab('login')" class="text-gray-400 hover:text-white">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <h3 class="text-lg font-semibold">Recuperar Contraseña</h3>
+            </div>
+            <p class="text-sm text-gray-400 mb-4">Ingresa tu email y te enviaremos un código de verificación.</p>
+            <div>
+                <label class="text-gray-300 text-sm font-medium block mb-2">Email</label>
+                <input id="forgot-email" type="email" placeholder="tu@email.com" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none transition"/>
+            </div>
+            <button onclick="sendRecoveryCode()" class="w-full bg-accent-cyan hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                Enviar Código
+            </button>
+            <div id="forgot-message" class="text-sm text-center hidden"></div>
         </div>
     </div>
 </div>
@@ -144,35 +204,8 @@
                             </tr>
                         </thead>
                         <tbody id="positions-table" class="text-sm">
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-4 font-medium">HG</td>
-                                <td class="py-4">10</td>
-                                <td class="py-4">4.5210</td>
-                                <td class="py-4">4.5300</td>
-                                <td class="py-4 text-green-500 font-semibold">+$900.00</td>
-                                <td class="py-4">
-                                    <button class="text-accent-cyan hover:text-cyan-400 font-medium">Close</button>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-4 font-medium">NQ</td>
-                                <td class="py-4">2</td>
-                                <td class="py-4">18300.25</td>
-                                <td class="py-4">18290.75</td>
-                                <td class="py-4 text-red-500 font-semibold">-$380.00</td>
-                                <td class="py-4">
-                                    <button class="text-accent-cyan hover:text-cyan-400 font-medium">Close</button>
-                                </td>
-                            </tr>
                             <tr>
-                                <td class="py-4 font-medium">CL</td>
-                                <td class="py-4">5</td>
-                                <td class="py-4">78.50</td>
-                                <td class="py-4">79.10</td>
-                                <td class="py-4 text-green-500 font-semibold">+$3000.00</td>
-                                <td class="py-4">
-                                    <button class="text-accent-cyan hover:text-cyan-400 font-medium">Close</button>
-                                </td>
+                                <td colspan="6" class="py-8 text-center text-gray-400">Cargando posiciones...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -196,32 +229,8 @@
                             </tr>
                         </thead>
                         <tbody id="history-table" class="text-sm">
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-4 font-medium">ES</td>
-                                <td class="py-4">BUY</td>
-                                <td class="py-4">1</td>
-                                <td class="py-4">5120.50</td>
-                                <td class="py-4">5135.75</td>
-                                <td class="py-4 text-green-500 font-semibold">+$762.50</td>
-                                <td class="py-4 text-gray-400">2024-05-21 10:30:15</td>
-                            </tr>
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-4 font-medium">GC</td>
-                                <td class="py-4">SELL</td>
-                                <td class="py-4">3</td>
-                                <td class="py-4">2410.20</td>
-                                <td class="py-4">2415.50</td>
-                                <td class="py-4 text-red-500 font-semibold">-$1590.00</td>
-                                <td class="py-4 text-gray-400">2024-05-21 09:45:22</td>
-                            </tr>
                             <tr>
-                                <td class="py-4 font-medium">NG</td>
-                                <td class="py-4">BUY</td>
-                                <td class="py-4">20</td>
-                                <td class="py-4">2.650</td>
-                                <td class="py-4">2.710</td>
-                                <td class="py-4 text-green-500 font-semibold">+$1200.00</td>
-                                <td class="py-4 text-gray-400">2024-05-21 08:12:40</td>
+                                <td colspan="7" class="py-8 text-center text-gray-400">Cargando historial...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -425,26 +434,26 @@
             </div>
 
             <!-- Results -->
-            <div class="bg-dark-card border border-dark-border rounded-xl p-6 mb-6">
+            <div id="backtest-results" class="bg-dark-card border border-dark-border rounded-xl p-6 mb-6 hidden">
                 <h3 class="text-xl font-bold mb-4">Resultados del Backtest</h3>
-                <p class="text-gray-400 text-sm mb-6">Resultados para: Momentum Scalper v2.1 en HG</p>
+                <p id="backtest-results-title" class="text-gray-400 text-sm mb-6"></p>
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div>
                         <p class="text-gray-400 text-sm mb-1">Beneficio / Pérdida Total</p>
-                        <p class="text-2xl font-bold text-green-500">+$12,450.75</p>
+                        <p id="backtest-total-pnl" class="text-2xl font-bold">$0.00</p>
                     </div>
                     <div>
                         <p class="text-gray-400 text-sm mb-1">% de Acierto</p>
-                        <p class="text-2xl font-bold">68.2%</p>
+                        <p id="backtest-win-rate" class="text-2xl font-bold">0%</p>
                     </div>
                     <div>
                         <p class="text-gray-400 text-sm mb-1">Profit Factor</p>
-                        <p class="text-2xl font-bold">2.15</p>
+                        <p id="backtest-profit-factor" class="text-2xl font-bold">0.00</p>
                     </div>
                     <div>
                         <p class="text-gray-400 text-sm mb-1">Drawdown Máximo</p>
-                        <p class="text-2xl font-bold text-red-500">-8.5%</p>
+                        <p id="backtest-max-drawdown" class="text-2xl font-bold text-red-500">0%</p>
                     </div>
                 </div>
 
@@ -457,9 +466,17 @@
                 </div>
             </div>
 
-            <!-- Trade History -->
-            <div class="bg-dark-card border border-dark-border rounded-xl p-6">
-                <h3 class="text-xl font-bold mb-4">Historial de Operaciones</h3>
+            <div id="backtest-no-results" class="bg-dark-card border border-dark-border rounded-xl p-6 mb-6">
+                <div class="text-center py-8">
+                    <span class="material-symbols-outlined text-6xl text-gray-600 mb-4">query_stats</span>
+                    <h3 class="text-xl font-bold mb-2">No hay resultados de backtest</h3>
+                    <p class="text-gray-400">Configure los parámetros arriba y presione "Ejecutar Backtest"</p>
+                </div>
+            </div>
+
+            <!-- Trade History del Backtest -->
+            <div id="backtest-trades" class="bg-dark-card border border-dark-border rounded-xl p-6 hidden">
+                <h3 class="text-xl font-bold mb-4">Historial de Operaciones del Backtest</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
@@ -473,33 +490,9 @@
                                 <th class="pb-4 font-medium">RESULTADO (%)</th>
                             </tr>
                         </thead>
-                        <tbody class="text-sm">
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-3 font-medium">HG</td>
-                                <td class="py-3 text-gray-400">2023-11-15 10:30</td>
-                                <td class="py-3"><span class="px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-xs font-semibold">Compra</span></td>
-                                <td class="py-3">3.7520</td>
-                                <td class="py-3">3.8150</td>
-                                <td class="py-3 text-green-500 font-semibold">+$630.00</td>
-                                <td class="py-3 text-green-500">+1.68%</td>
-                            </tr>
-                            <tr class="border-b border-dark-border/50">
-                                <td class="py-3 font-medium">HG</td>
-                                <td class="py-3 text-gray-400">2023-11-18 14:00</td>
-                                <td class="py-3"><span class="px-3 py-1 rounded-full bg-red-500/20 text-red-500 text-xs font-semibold">Venta</span></td>
-                                <td class="py-3">3.8210</td>
-                                <td class="py-3">3.7890</td>
-                                <td class="py-3 text-red-500 font-semibold">-$320.00</td>
-                                <td class="py-3 text-red-500">-0.84%</td>
-                            </tr>
+                        <tbody id="backtest-trades-table" class="text-sm">
                             <tr>
-                                <td class="py-3 font-medium">HG</td>
-                                <td class="py-3 text-gray-400">2023-11-20 09:45</td>
-                                <td class="py-3"><span class="px-3 py-1 rounded-full bg-green-500/20 text-green-500 text-xs font-semibold">Compra</span></td>
-                                <td class="py-3">3.8050</td>
-                                <td class="py-3">3.8800</td>
-                                <td class="py-3 text-green-500 font-semibold">+$750.00</td>
-                                <td class="py-3 text-green-500">+1.97%</td>
+                                <td colspan="7" class="py-8 text-center text-gray-400">No hay trades para mostrar</td>
                             </tr>
                         </tbody>
                     </table>
@@ -510,55 +503,55 @@
         <!-- Config Module -->
         <div id="module-config" class="module-hidden">
             <div class="max-w-4xl space-y-6">
+                <!-- User Info -->
+                <div class="bg-dark-card border border-dark-border rounded-xl p-6">
+                    <h3 class="text-xl font-bold mb-2">Información de Usuario</h3>
+                    <p class="text-gray-400 text-sm mb-4">Tu información de cuenta actual.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-gray-300 text-sm font-medium block mb-2">Usuario Actual</label>
+                            <input type="text" id="current-user-display" readonly class="w-full bg-dark-bg text-gray-400 rounded-lg px-4 py-3 border border-dark-border cursor-not-allowed" value="Cargando..."/>
+                        </div>
+                        <div>
+                            <label class="text-gray-300 text-sm font-medium block mb-2">Email</label>
+                            <input type="text" id="current-email-display" readonly class="w-full bg-dark-bg text-gray-400 rounded-lg px-4 py-3 border border-dark-border cursor-not-allowed" value="Cargando..."/>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- TopstepX Connection -->
                 <div class="bg-dark-card border border-dark-border rounded-xl p-6">
-                    <h3 class="text-xl font-bold mb-2">Conexión a Topstepx</h3>
-                    <p class="text-gray-400 text-sm mb-4">Introduce tu API Key para conectar la aplicación.</p>
+                    <h3 class="text-xl font-bold mb-2">Conexión a TopstepX</h3>
+                    <p class="text-gray-400 text-sm mb-4">Configura tu API Key de TopstepX para operar.</p>
 
                     <div class="mb-4">
-                        <label class="text-gray-300 text-sm font-medium block mb-2">Topstepx API Key</label>
+                        <label class="text-gray-300 text-sm font-medium block mb-2">Usuario de TopstepX</label>
+                        <input type="text" id="config-topstep-username" placeholder="usuario@email.com" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none"/>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="text-gray-300 text-sm font-medium block mb-2">TopstepX API Key</label>
                         <div class="relative">
                             <input type="password" id="config-api-key" placeholder="••••••••••••••••" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 pr-12 border border-dark-border focus:border-accent-cyan focus:outline-none"/>
-                            <button class="absolute right-3 top-3 text-gray-400 hover:text-white">
-                                <span class="material-symbols-outlined">visibility</span>
+                            <button onclick="toggleApiKeyVisibility()" class="absolute right-3 top-3 text-gray-400 hover:text-white">
+                                <span id="api-key-visibility-icon" class="material-symbols-outlined">visibility</span>
                             </button>
                         </div>
                     </div>
 
                     <div class="flex gap-3">
-                        <button class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition">
+                        <button onclick="testTopstepConnection()" class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition">
                             Probar Conexión
                         </button>
-                        <button class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
-                            Guardar API Key
+                        <button onclick="saveTopstepApiKey()" class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
+                            Guardar y Conectar
                         </button>
                     </div>
-                </div>
 
-                <!-- User Credentials -->
-                <div class="bg-dark-card border border-dark-border rounded-xl p-6">
-                    <h3 class="text-xl font-bold mb-2">Credenciales de Usuario</h3>
-                    <p class="text-gray-400 text-sm mb-4">Gestiona las credenciales de tu cuenta en la aplicación.</p>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="text-gray-300 text-sm font-medium block mb-2">Nombre de Usuario</label>
-                            <input type="text" placeholder="j.doe" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 border border-dark-border focus:border-accent-cyan focus:outline-none"/>
-                        </div>
-                        <div>
-                            <label class="text-gray-300 text-sm font-medium block mb-2">Contraseña</label>
-                            <div class="relative">
-                                <input type="password" placeholder="••••••••••••••••" class="w-full bg-dark-bg text-white rounded-lg px-4 py-3 pr-12 border border-dark-border focus:border-accent-cyan focus:outline-none"/>
-                                <button class="absolute right-3 top-3 text-gray-400 hover:text-white">
-                                    <span class="material-symbols-outlined">visibility_off</span>
-                                </button>
-                            </div>
-                        </div>
+                    <div id="topstep-connection-status" class="mt-4 p-4 rounded-lg hidden">
+                        <p id="topstep-connection-message" class="text-sm"></p>
                     </div>
-
-                    <button class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
-                        Guardar Credenciales
-                    </button>
                 </div>
 
                 <!-- Notifications -->

@@ -188,13 +188,23 @@ async function updateStats() {
     }
 }
 
-function updateDashboardStats() {
+async function updateDashboardStats() {
     const stats = state.stats;
 
-    // Balance (podría venir del backend)
-    const balanceEl = document.getElementById('balance');
-    if (balanceEl) {
-        balanceEl.textContent = `$150,432.10`; // Mock data from images
+    // Balance - obtener de TopstepX API
+    try {
+        const balanceResponse = await fetch(`${API_BASE_URL}/api/account/balance`);
+        if (balanceResponse.ok) {
+            const balanceData = await balanceResponse.json();
+            const balanceEl = document.getElementById('balance');
+            if (balanceEl && balanceData.balance !== undefined) {
+                balanceEl.textContent = `$${balanceData.balance.toFixed(2)}`;
+            }
+        }
+    } catch (error) {
+        console.error('Error obteniendo balance:', error);
+        const balanceEl = document.getElementById('balance');
+        if (balanceEl) balanceEl.textContent = '$0.00';
     }
 
     // P&L Diario
@@ -228,11 +238,43 @@ async function loadPositions() {
         const response = await fetch(`${API_BASE_URL}/api/positions?status=OPEN`);
         state.positions = await response.json();
 
-        // updatePositionsTable(); // Ya tiene datos mock en HTML
+        updatePositionsTable();
 
     } catch (error) {
         console.error('Error cargando posiciones:', error);
     }
+}
+
+function updatePositionsTable() {
+    const tableBody = document.getElementById('positions-table');
+    if (!tableBody) return;
+
+    if (!state.positions || state.positions.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-8 text-center text-gray-400">No hay posiciones activas</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = state.positions.map(pos => {
+        const pnlColor = pos.pnl >= 0 ? 'text-green-500' : 'text-red-500';
+        const pnlSign = pos.pnl >= 0 ? '+' : '';
+
+        return `
+            <tr class="border-b border-dark-border/50">
+                <td class="py-4 font-medium">${pos.contract_name}</td>
+                <td class="py-4">${pos.quantity}</td>
+                <td class="py-4">${pos.entry_price.toFixed(2)}</td>
+                <td class="py-4">-</td>
+                <td class="py-4 ${pnlColor} font-semibold">${pnlSign}$${Math.abs(pos.pnl || 0).toFixed(2)}</td>
+                <td class="py-4">
+                    <button onclick="closePosition('${pos.id}')" class="text-accent-cyan hover:text-cyan-400 font-medium">Close</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // ============================================================================
@@ -244,11 +286,44 @@ async function loadTradesHistory() {
         const response = await fetch(`${API_BASE_URL}/api/trades?limit=50`);
         state.trades = await response.json();
 
-        // updateTradesTable(); // Ya tiene datos mock en HTML
+        updateTradesTable();
 
     } catch (error) {
         console.error('Error cargando historial:', error);
     }
+}
+
+function updateTradesTable() {
+    const tableBody = document.getElementById('history-table');
+    if (!tableBody) return;
+
+    if (!state.trades || state.trades.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-8 text-center text-gray-400">No hay trades realizados</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = state.trades.map(trade => {
+        const pnlColor = trade.pnl >= 0 ? 'text-green-500' : 'text-red-500';
+        const pnlSign = trade.pnl >= 0 ? '+' : '';
+        const typeClass = trade.side === 'LONG' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500';
+        const typeText = trade.side === 'LONG' ? 'BUY' : 'SELL';
+
+        return `
+            <tr class="border-b border-dark-border/50">
+                <td class="py-4 font-medium">${trade.contract_name}</td>
+                <td class="py-4">${typeText}</td>
+                <td class="py-4">${trade.quantity}</td>
+                <td class="py-4">${trade.entry_price.toFixed(2)}</td>
+                <td class="py-4">${trade.exit_price.toFixed(2)}</td>
+                <td class="py-4 ${pnlColor} font-semibold">${pnlSign}$${Math.abs(trade.pnl).toFixed(2)}</td>
+                <td class="py-4 text-gray-400">${new Date(trade.exit_time).toLocaleString()}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // ============================================================================
