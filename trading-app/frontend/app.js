@@ -1,12 +1,17 @@
 // Trading App - Frontend JavaScript
 // Conecta con FastAPI backend integrado (RL + DB + API)
 
-const API_BASE_URL = 'http://localhost:8000';
+// Detectar automáticamente el host del backend
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000'
+    : `${window.location.protocol}//${window.location.hostname}:8000`;
 
 // Estado global
 const state = {
     authenticated: false,
     accountId: null,
+    selectedAccountData: null,
+    availableAccounts: [],
     contracts: [],
     currentContract: null,
     positions: [],
@@ -36,22 +41,26 @@ async function login() {
         const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({api_key: apiKey, username: username})
+            body: JSON.stringify({
+                api_key: apiKey,
+                username: username,
+                system_username: 'default_user'
+            })
         });
 
         const data = await response.json();
 
         if (data.success) {
             state.authenticated = true;
-            state.accountId = data.account_id;
+            state.availableAccounts = data.accounts || [];
 
             showMessage(messageEl, '✅ Conectado exitosamente', 'success');
 
             setTimeout(() => {
                 document.getElementById('auth-modal').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
-                document.getElementById('account-id').textContent = state.accountId;
 
+                populateAccountSelector();
                 initWebSocket();
                 loadInitialData();
             }, 1000);
@@ -62,6 +71,97 @@ async function login() {
     } catch (error) {
         console.error('Error en login:', error);
         showMessage(messageEl, '❌ Error de conexión', 'error');
+    }
+}
+
+function populateAccountSelector() {
+    const selector = document.getElementById('account-selector');
+    const noCredsMessage = document.getElementById('no-credentials-message');
+
+    if (!state.availableAccounts || state.availableAccounts.length === 0) {
+        // Mostrar mensaje de "Ingresa credenciales"
+        selector.classList.add('hidden');
+        noCredsMessage.classList.remove('hidden');
+        return;
+    }
+
+    // Ocultar mensaje y mostrar selector
+    noCredsMessage.classList.add('hidden');
+    selector.classList.remove('hidden');
+
+    // Limpiar opciones existentes
+    selector.innerHTML = '<option value="">Selecciona una cuenta</option>';
+
+    // Agregar cuentas
+    state.availableAccounts.forEach(account => {
+        const option = document.createElement('option');
+        option.value = account.id;
+        option.textContent = `${account.name} - $${account.balance.toFixed(2)}`;
+        option.selected = account.is_selected || false;
+
+        // Guardar datos de la cuenta en el option
+        option.dataset.accountData = JSON.stringify(account);
+
+        selector.appendChild(option);
+
+        // Si es la cuenta seleccionada, actualizar estado
+        if (account.is_selected) {
+            state.accountId = account.id;
+            state.selectedAccountData = account;
+        }
+    });
+
+    // Evento de cambio de cuenta
+    selector.addEventListener('change', handleAccountChange);
+}
+
+async function handleAccountChange(event) {
+    const selector = event.target;
+    const selectedOption = selector.options[selector.selectedIndex];
+
+    if (!selectedOption || !selectedOption.value) return;
+
+    const accountId = selectedOption.value;
+    const accountData = JSON.parse(selectedOption.dataset.accountData || '{}');
+
+    try {
+        // Llamar al backend para marcar la cuenta como seleccionada
+        const response = await fetch(`${API_BASE_URL}/api/auth/select-account`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({account_id: accountId})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            state.accountId = accountId;
+            state.selectedAccountData = accountData;
+
+            console.log(`✅ Cuenta cambiada a: ${data.account_name}`);
+
+            // Recargar datos para la nueva cuenta
+            await loadAccountData();
+        }
+
+    } catch (error) {
+        console.error('Error cambiando cuenta:', error);
+        alert('Error al cambiar de cuenta');
+    }
+}
+
+async function loadAccountData() {
+    // Recargar todos los datos específicos de la cuenta seleccionada
+    await updateStats();
+    await loadTradesHistory();
+    await loadPositions();
+    await updateDashboardBalance();
+}
+
+function updateDashboardBalance() {
+    const balanceEl = document.getElementById('balance');
+    if (balanceEl && state.selectedAccountData) {
+        balanceEl.textContent = `$${state.selectedAccountData.balance.toFixed(2)}`;
     }
 }
 
@@ -115,7 +215,14 @@ function initWebSocket() {
         state.wsConnection.close();
     }
 
-    state.wsConnection = new WebSocket('ws://localhost:8000/ws');
+    // Construir URL del WebSocket dinámicamente
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'localhost:8000'
+        : `${window.location.hostname}:8000`;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws`;
+
+    state.wsConnection = new WebSocket(wsUrl);
 
     state.wsConnection.onopen = () => {
         console.log('✅ WebSocket conectado');
@@ -191,10 +298,12 @@ async function updateStats() {
 function updateDashboardStats() {
     const stats = state.stats;
 
-    // Balance (podría venir del backend)
+    // Balance (viene de la cuenta seleccionada)
     const balanceEl = document.getElementById('balance');
-    if (balanceEl) {
-        balanceEl.textContent = `$150,432.10`; // Mock data from images
+    if (balanceEl && state.selectedAccountData) {
+        balanceEl.textContent = `$${state.selectedAccountData.balance.toFixed(2)}`;
+    } else if (balanceEl) {
+        balanceEl.textContent = `$0.00`;
     }
 
     // P&L Diario
@@ -204,18 +313,24 @@ function updateDashboardStats() {
         const pnlSign = stats.total_pnl >= 0 ? '+' : '';
         pnlEl.className = `text-3xl font-bold ${pnlColor}`;
         pnlEl.textContent = `${pnlSign}$${Math.abs(stats.total_pnl).toFixed(2)}`;
+    } else if (pnlEl) {
+        pnlEl.textContent = `$0.00`;
     }
 
     // Win Rate
     const winRateEl = document.getElementById('win-rate');
     if (winRateEl && stats.win_rate !== undefined) {
-        winRateEl.textContent = `${(stats.win_rate * 100).toFixed(0)}%`;
+        winRateEl.textContent = `${(stats.win_rate).toFixed(0)}%`;
+    } else if (winRateEl) {
+        winRateEl.textContent = `0%`;
     }
 
     // Max Drawdown
     const maxDDEl = document.getElementById('max-drawdown');
     if (maxDDEl && stats.max_drawdown !== undefined) {
         maxDDEl.textContent = `-$${Math.abs(stats.max_drawdown).toFixed(2)}`;
+    } else if (maxDDEl) {
+        maxDDEl.textContent = `$0.00`;
     }
 }
 
@@ -466,25 +581,45 @@ setInterval(async () => {
     }
 }, 30000); // Cada 30 segundos
 
-// Verificar autenticación al cargar
+// Verificar autenticación y credenciales guardadas al cargar
 window.addEventListener('DOMContentLoaded', async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/status`);
-        const data = await response.json();
+        // Verificar si hay credenciales guardadas
+        const credsResponse = await fetch(`${API_BASE_URL}/api/auth/credentials?system_username=default_user`);
+        const credsData = await credsResponse.json();
 
-        if (data.authenticated) {
-            // Ya estaba autenticado
-            state.authenticated = true;
-            state.accountId = data.account_id;
+        if (credsData.success && credsData.has_credentials) {
+            // Hay credenciales guardadas
+            state.availableAccounts = credsData.accounts || [];
 
-            document.getElementById('auth-modal').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
-            document.getElementById('account-id').textContent = state.accountId || 'N/A';
+            // Verificar estado de autenticación
+            const statusResponse = await fetch(`${API_BASE_URL}/api/auth/status`);
+            const statusData = await statusResponse.json();
 
-            await loadInitialData();
-            initWebSocket();
+            if (statusData.authenticated) {
+                // Ya autenticado, mostrar app
+                state.authenticated = true;
+                state.accountId = statusData.account_id;
+
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+
+                populateAccountSelector();
+                await loadInitialData();
+                initWebSocket();
+            } else {
+                // Hay credenciales pero no autenticado, mostrar selector
+                populateAccountSelector();
+            }
+        } else {
+            // No hay credenciales, mostrar mensaje
+            const selector = document.getElementById('account-selector');
+            const noCredsMessage = document.getElementById('no-credentials-message');
+            selector.classList.add('hidden');
+            noCredsMessage.classList.remove('hidden');
         }
     } catch (error) {
+        console.error('Error verificando credenciales:', error);
         // No autenticado, mostrar modal
         console.log('No autenticado, mostrando modal de login');
     }

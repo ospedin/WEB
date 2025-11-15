@@ -26,7 +26,7 @@ from db.models import (
     Base, HistoricalBar, Indicator, TradingSignal, Position, Trade,
     DailyStat, Contract as ContractModel, BotConfig, TradingSchedule,
     RLTrainingEpisode, RLAction, ContractBotConfig, ContractIndicatorConfig,
-    BacktestRun
+    BacktestRun, User, UserCredential, TopstepAccount
 )
 
 import logging
@@ -182,6 +182,15 @@ class StatsResponse(BaseModel):
 class AuthRequest(BaseModel):
     api_key: str
     username: str
+    system_username: Optional[str] = "default_user"  # Usuario del sistema (opcional)
+
+class AccountSelectionRequest(BaseModel):
+    account_id: str
+
+class SaveCredentialsRequest(BaseModel):
+    api_key: str
+    username: str
+    system_username: Optional[str] = "default_user"
 
 # ============================================================================
 # STARTUP Y SHUTDOWN
@@ -426,32 +435,109 @@ async def root():
 
 @app.post("/api/auth/login")
 async def login(auth: AuthRequest):
-    """Autenticación con TopstepX API"""
+    """Autenticación con TopstepX API y guardado de credenciales"""
     global topstep_client
 
+    db = get_db()
     try:
         logger.info(f"Intentando autenticación para usuario: {auth.username}")
 
+        # Intentar autenticación
         topstep_client = TopstepAPIClient(auth.api_key, auth.username)
 
         # Obtener cuentas
         accounts = topstep_client.get_accounts()
 
-        if accounts:
-            topstep_client.account_id = str(accounts[0]['id'])
+        if not accounts:
+            return {"success": False, "message": "No hay cuentas disponibles"}
 
-            return {
-                "success": True,
-                "message": "Autenticación exitosa",
-                "account_id": topstep_client.account_id,
-                "accounts": accounts
-            }
+        # Guardar/actualizar usuario del sistema
+        system_user = db.query(User).filter(User.username == auth.system_username).first()
+        if not system_user:
+            system_user = User(username=auth.system_username)
+            db.add(system_user)
+            db.flush()
 
-        return {"success": False, "message": "No hay cuentas disponibles"}
+        # Guardar/actualizar credenciales
+        credential = db.query(UserCredential).filter(
+            UserCredential.user_id == system_user.id,
+            UserCredential.username == auth.username
+        ).first()
+
+        if not credential:
+            credential = UserCredential(
+                user_id=system_user.id,
+                api_key=auth.api_key,
+                username=auth.username,
+                is_active=True
+            )
+            db.add(credential)
+        else:
+            credential.api_key = auth.api_key
+            credential.is_active = True
+
+        db.flush()
+
+        # Guardar/actualizar cuentas
+        saved_accounts = []
+        for idx, acc in enumerate(accounts):
+            account_id = str(acc['id'])
+            account_name = acc.get('name', f"Cuenta {account_id}")
+
+            existing_account = db.query(TopstepAccount).filter(
+                TopstepAccount.account_id == account_id
+            ).first()
+
+            if not existing_account:
+                new_account = TopstepAccount(
+                    credential_id=credential.id,
+                    account_id=account_id,
+                    account_name=account_name,
+                    balance=acc.get('balance', 0),
+                    can_trade=acc.get('canTrade', True),
+                    is_visible=acc.get('isVisible', True),
+                    simulated=acc.get('simulated', False),
+                    is_selected=(idx == 0),  # Primera cuenta seleccionada por defecto
+                    last_sync=datetime.now()
+                )
+                db.add(new_account)
+                saved_accounts.append({
+                    "id": account_id,
+                    "name": account_name,
+                    "balance": acc.get('balance', 0),
+                    "can_trade": acc.get('canTrade', True),
+                    "is_selected": (idx == 0)
+                })
+            else:
+                existing_account.balance = acc.get('balance', existing_account.balance)
+                existing_account.can_trade = acc.get('canTrade', existing_account.can_trade)
+                existing_account.last_sync = datetime.now()
+                saved_accounts.append({
+                    "id": account_id,
+                    "name": existing_account.account_name,
+                    "balance": existing_account.balance,
+                    "can_trade": existing_account.can_trade,
+                    "is_selected": existing_account.is_selected
+                })
+
+        db.commit()
+
+        # Establecer la primera cuenta como activa
+        topstep_client.account_id = str(accounts[0]['id'])
+
+        return {
+            "success": True,
+            "message": "Autenticación exitosa y credenciales guardadas",
+            "credential_id": credential.id,
+            "accounts": saved_accounts
+        }
 
     except Exception as e:
+        db.rollback()
         logger.error(f"Error en autenticación: {e}")
         raise HTTPException(status_code=401, detail=str(e))
+    finally:
+        db.close()
 
 @app.get("/api/auth/status")
 async def auth_status():
@@ -460,6 +546,90 @@ async def auth_status():
         "authenticated": topstep_client is not None,
         "account_id": topstep_client.account_id if topstep_client else None
     }
+
+@app.get("/api/auth/credentials")
+async def get_saved_credentials(system_username: str = "default_user"):
+    """Obtener credenciales guardadas del usuario"""
+    db = get_db()
+    try:
+        system_user = db.query(User).filter(User.username == system_username).first()
+        if not system_user:
+            return {"success": True, "has_credentials": False, "accounts": []}
+
+        credentials = db.query(UserCredential).filter(
+            UserCredential.user_id == system_user.id,
+            UserCredential.is_active == True
+        ).all()
+
+        if not credentials:
+            return {"success": True, "has_credentials": False, "accounts": []}
+
+        all_accounts = []
+        for cred in credentials:
+            accounts = db.query(TopstepAccount).filter(
+                TopstepAccount.credential_id == cred.id
+            ).all()
+
+            for acc in accounts:
+                all_accounts.append({
+                    "id": acc.account_id,
+                    "name": acc.account_name,
+                    "balance": acc.balance,
+                    "can_trade": acc.can_trade,
+                    "is_selected": acc.is_selected,
+                    "simulated": acc.simulated
+                })
+
+        return {
+            "success": True,
+            "has_credentials": True,
+            "accounts": all_accounts
+        }
+
+    except Exception as e:
+        logger.error(f"Error obteniendo credenciales: {e}")
+        return {"success": False, "error": str(e)}
+    finally:
+        db.close()
+
+@app.post("/api/auth/select-account")
+async def select_account(request: AccountSelectionRequest):
+    """Seleccionar cuenta activa"""
+    global topstep_client
+
+    db = get_db()
+    try:
+        # Desmarcar todas las cuentas como seleccionadas
+        db.query(TopstepAccount).update({"is_selected": False})
+
+        # Marcar la cuenta seleccionada
+        selected_account = db.query(TopstepAccount).filter(
+            TopstepAccount.account_id == request.account_id
+        ).first()
+
+        if not selected_account:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+        selected_account.is_selected = True
+        db.commit()
+
+        # Actualizar cliente TopstepX
+        if topstep_client:
+            topstep_client.account_id = request.account_id
+
+        return {
+            "success": True,
+            "message": "Cuenta seleccionada correctamente",
+            "account_id": request.account_id,
+            "account_name": selected_account.account_name
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error seleccionando cuenta: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 # ---------- CONTRATOS ----------
 

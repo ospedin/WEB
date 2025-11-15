@@ -13,7 +13,8 @@
 2️⃣  Ejecuta (click derecho → Ejecutar como Administrador):
     📄 instalar.bat
 
-3️⃣  Edita el archivo .env con tus credenciales de TopstepX
+3️⃣  Inicia el sistema y accede a http://localhost:3000
+    (Las credenciales de TopstepX se configuran desde la interfaz web)
 
 
 ▶️  INICIAR EL SISTEMA

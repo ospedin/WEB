@@ -4,6 +4,51 @@
 -- Activar TimescaleDB
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
+-- Tabla de usuarios (credenciales)
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+
+-- Tabla de credenciales TopstepX
+CREATE TABLE IF NOT EXISTS user_credentials (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_key TEXT NOT NULL,
+    username VARCHAR(100) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, username)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_credentials_user ON user_credentials (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_credentials_active ON user_credentials (is_active);
+
+-- Tabla de cuentas TopstepX asociadas a credenciales
+CREATE TABLE IF NOT EXISTS topstep_accounts (
+    id SERIAL PRIMARY KEY,
+    credential_id INTEGER NOT NULL REFERENCES user_credentials(id) ON DELETE CASCADE,
+    account_id VARCHAR(50) NOT NULL UNIQUE,
+    account_name VARCHAR(200) NOT NULL,
+    balance DOUBLE PRECISION DEFAULT 0,
+    can_trade BOOLEAN DEFAULT TRUE,
+    is_visible BOOLEAN DEFAULT TRUE,
+    simulated BOOLEAN DEFAULT FALSE,
+    is_selected BOOLEAN DEFAULT FALSE,
+    last_sync TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_topstep_accounts_credential ON topstep_accounts (credential_id);
+CREATE INDEX IF NOT EXISTS idx_topstep_accounts_account_id ON topstep_accounts (account_id);
+CREATE INDEX IF NOT EXISTS idx_topstep_accounts_selected ON topstep_accounts (is_selected);
+
 -- Tabla de barras históricas (OHLCV)
 CREATE TABLE IF NOT EXISTS historical_bars (
     time TIMESTAMPTZ NOT NULL,
@@ -280,6 +325,15 @@ CREATE TRIGGER update_contracts_updated_at BEFORE UPDATE ON contracts
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_daily_stats_updated_at BEFORE UPDATE ON daily_stats
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_credentials_updated_at BEFORE UPDATE ON user_credentials
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_topstep_accounts_updated_at BEFORE UPDATE ON topstep_accounts
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Políticas de retención (mantener solo 90 días de datos crudos)

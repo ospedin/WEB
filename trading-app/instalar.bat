@@ -186,15 +186,11 @@ if not exist ".env" (
     echo # Modelo de Machine Learning >> .env
     echo ML_MODEL_PATH=/app/models/ppo_trading_model.zip >> .env
     echo. >> .env
-    echo # TopstepX API (Configurar con tus credenciales) >> .env
-    echo TOPSTEP_API_KEY=tu_api_key_aqui >> .env
-    echo TOPSTEP_USERNAME=tu_username_aqui >> .env
-    echo. >> .env
     echo # Python >> .env
     echo PYTHONUNBUFFERED=1 >> .env
     echo OK - .env creado
     echo.
-    echo [IMPORTANTE] Edita el archivo .env y configura tus credenciales de TopstepX
+    echo [IMPORTANTE] Las credenciales de TopstepX se configuran desde la interfaz web
 ) else (
     echo OK - .env ya existe
 )
@@ -229,15 +225,15 @@ echo ===========================================================================
 echo.
 echo PROXIMOS PASOS:
 echo.
-echo 1. Edita el archivo .env con tus credenciales de TopstepX
+echo 1. Inicia los servicios ejecutando: iniciar.bat
 echo.
-echo 2. Inicia los servicios ejecutando: iniciar.bat
-echo.
-echo 3. Accede a:
+echo 2. Accede a:
 echo    - Frontend:    http://localhost:3000
 echo    - Backend API: http://localhost:8000
 echo    - Grafana:     http://localhost:3001 (user: admin, pass: admin)
 echo    - Prometheus:  http://localhost:9090
+echo.
+echo 3. Ingresa tus credenciales de TopstepX desde la interfaz web (http://localhost:3000)
 echo.
 echo 4. Para detener los servicios: detener.bat
 echo.

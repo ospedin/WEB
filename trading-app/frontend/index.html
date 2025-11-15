@@ -89,13 +89,29 @@
                 </button>
             </nav>
 
-            <!-- Right Side: Connection Status + ID + Avatar -->
+            <!-- Right Side: Connection Status + Account Selector + Avatar -->
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span class="text-sm text-gray-300">Conectado a Topstepx</span>
+                    <div id="connection-indicator" class="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span id="connection-status" class="text-sm text-gray-300">Conectado a Topstepx</span>
                 </div>
-                <span class="text-sm text-gray-400">ID: <span id="account-id" class="text-gray-300">-</span></span>
+
+                <!-- Account Selector -->
+                <div class="relative">
+                    <div id="account-selector-container">
+                        <!-- Mostrar mensaje si no hay credenciales -->
+                        <div id="no-credentials-message" class="text-sm text-yellow-400 hidden">
+                            <span class="material-symbols-outlined text-base align-middle">warning</span>
+                            <span>Ingresa credenciales</span>
+                        </div>
+
+                        <!-- Selector de cuentas -->
+                        <select id="account-selector" class="hidden bg-dark-bg text-white rounded-lg px-4 py-2 border border-dark-border focus:border-accent-cyan focus:outline-none cursor-pointer text-sm">
+                            <option value="">Selecciona una cuenta</option>
+                        </select>
+                    </div>
+                </div>
+
                 <button class="text-gray-400 hover:text-white">
                     <span class="material-symbols-outlined">notifications</span>
                 </button>

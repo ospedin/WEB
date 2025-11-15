@@ -3,9 +3,58 @@ from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, Date, 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 
 Base = declarative_base()
+
+class User(Base):
+    """Usuario del sistema"""
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    credentials = relationship("UserCredential", back_populates="user", cascade="all, delete-orphan")
+
+class UserCredential(Base):
+    """Credenciales de TopstepX de un usuario"""
+    __tablename__ = 'user_credentials'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    api_key = Column(Text, nullable=False)
+    username = Column(String(100), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="credentials")
+    accounts = relationship("TopstepAccount", back_populates="credential", cascade="all, delete-orphan")
+
+class TopstepAccount(Base):
+    """Cuenta de TopstepX asociada a credenciales"""
+    __tablename__ = 'topstep_accounts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    credential_id = Column(Integer, ForeignKey('user_credentials.id', ondelete='CASCADE'), nullable=False, index=True)
+    account_id = Column(String(50), nullable=False, unique=True, index=True)
+    account_name = Column(String(200), nullable=False)
+    balance = Column(Float, default=0)
+    can_trade = Column(Boolean, default=True)
+    is_visible = Column(Boolean, default=True)
+    simulated = Column(Boolean, default=False)
+    is_selected = Column(Boolean, default=False, index=True)
+    last_sync = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    credential = relationship("UserCredential", back_populates="accounts")
 
 class HistoricalBar(Base):
     __tablename__ = 'historical_bars'
