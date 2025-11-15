@@ -9,9 +9,6 @@ echo.
 echo Verificando y liberando puertos necesarios...
 echo.
 
-:: Lista de puertos a verificar y liberar
-set PORTS=8000 3000 5432 6379 9090 3001
-
 :: Detener contenedores Docker primero
 echo [1/2] Deteniendo contenedores Docker existentes...
 docker-compose down 2>nul
@@ -22,21 +19,23 @@ echo.
 
 :: Liberar cada puerto
 echo [2/2] Liberando puertos ocupados...
-for %%P in (%PORTS%) do (
-    echo    Verificando puerto %%P...
-    for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%%P ^| findstr LISTENING') do (
-        set PID=%%a
-        if not "!PID!"=="" (
-            echo       [OCUPADO] Liberando puerto %%P (PID: !PID!)
-            taskkill /F /PID !PID! >nul 2>&1
-            if !errorLevel! equ 0 (
-                echo       [OK] Puerto %%P liberado
-            ) else (
-                echo       [ADVERTENCIA] No se pudo liberar puerto %%P (puede requerir permisos de administrador)
-            )
-        )
-    )
-)
+echo    Liberando puerto 8000...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+
+echo    Liberando puerto 3000...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+
+echo    Liberando puerto 5432...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5432 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+
+echo    Liberando puerto 6379...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :6379 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+
+echo    Liberando puerto 9090...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :9090 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+
+echo    Liberando puerto 3001...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3001 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
 
 echo.
 echo ================================================================================

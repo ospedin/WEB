@@ -1,5 +1,4 @@
 @echo off
-setlocal enabledelayedexpansion
 color 0B
 cls
 echo ================================================================================
@@ -52,15 +51,12 @@ docker rm -f trading_backend trading_frontend trading_postgres trading_redis tra
 
 :: Liberar puertos del sistema
 echo Liberando puertos del sistema (8000, 3000, 5432, 6379, 9090, 3001)...
-for %%P in (8000 3000 5432 6379 9090 3001) do (
-    for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%%P ^| findstr LISTENING 2^>nul') do (
-        set PID=%%a
-        if not "!PID!"=="" (
-            echo    Liberando puerto %%P (PID: !PID!)...
-            taskkill /F /PID !PID! >nul 2>&1
-        )
-    )
-)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5432 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :6379 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :9090 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3001 ^| findstr LISTENING 2^>nul') do taskkill /F /PID %%a >nul 2>&1
 echo OK - Puertos liberados
 echo.
 
