@@ -13,7 +13,10 @@ const state = {
     trades: [],
     stats: {},
     wsConnection: null,
-    botActive: false
+    botActive: false,
+    topstepConnected: false,
+    topstepApiKey: null,
+    topstepUsername: null
 };
 
 // ============================================================================
@@ -780,8 +783,21 @@ async function testTopstepConnection() {
     const messageEl = document.getElementById('topstep-connection-message');
 
     if (!apiKey || !username) {
-        alert('❌ Ingresa API Key y Username');
+        if (statusDiv && messageEl) {
+            statusDiv.classList.remove('hidden', 'bg-green-500/20');
+            statusDiv.classList.add('bg-red-500/20');
+            messageEl.textContent = '❌ Ingresa API Key y Username';
+            messageEl.className = 'text-sm text-red-500';
+        }
         return;
+    }
+
+    // Mostrar mensaje de prueba
+    if (statusDiv && messageEl) {
+        statusDiv.classList.remove('hidden', 'bg-red-500/20', 'bg-green-500/20');
+        statusDiv.classList.add('bg-yellow-500/20');
+        messageEl.textContent = '🔄 Probando conexión...';
+        messageEl.className = 'text-sm text-yellow-500';
     }
 
     try {
@@ -795,29 +811,232 @@ async function testTopstepConnection() {
 
         if (statusDiv && messageEl) {
             if (data.success) {
-                statusDiv.classList.remove('hidden', 'bg-red-500/20');
+                statusDiv.classList.remove('hidden', 'bg-red-500/20', 'bg-yellow-500/20');
                 statusDiv.classList.add('bg-green-500/20');
-                messageEl.textContent = '✅ Conexión exitosa a TopstepX';
+                messageEl.textContent = '✅ Conexión exitosa a TopstepX - Account ID: ' + (data.account_id || 'N/A');
                 messageEl.className = 'text-sm text-green-500';
             } else {
-                statusDiv.classList.remove('hidden', 'bg-green-500/20');
+                statusDiv.classList.remove('hidden', 'bg-green-500/20', 'bg-yellow-500/20');
                 statusDiv.classList.add('bg-red-500/20');
                 messageEl.textContent = '❌ Error en conexión: ' + (data.message || 'Desconocido');
                 messageEl.className = 'text-sm text-red-500';
             }
         }
     } catch (error) {
+        console.error('Error probando conexión:', error);
         if (statusDiv && messageEl) {
-            statusDiv.classList.remove('hidden', 'bg-green-500/20');
+            statusDiv.classList.remove('hidden', 'bg-green-500/20', 'bg-yellow-500/20');
             statusDiv.classList.add('bg-red-500/20');
-            messageEl.textContent = '❌ Error de conexión';
+            messageEl.textContent = '❌ Error de conexión con el servidor';
             messageEl.className = 'text-sm text-red-500';
         }
     }
 }
 
-async function saveTopstepApiKey() {
-    alert('✅ API Key guardada (funcionalidad completa por implementar)');
+async function toggleTopstepConnection() {
+    if (state.topstepConnected) {
+        // Desconectar
+        await disconnectTopstepX();
+    } else {
+        // Conectar
+        await connectTopstepX();
+    }
+}
+
+async function connectTopstepX() {
+    const apiKey = document.getElementById('config-api-key').value;
+    const username = document.getElementById('config-topstep-username').value;
+    const statusDiv = document.getElementById('topstep-connection-status');
+    const messageEl = document.getElementById('topstep-connection-message');
+    const indicator = document.getElementById('topstep-connection-indicator');
+    const statusIcon = document.getElementById('topstep-status-icon');
+    const statusText = document.getElementById('topstep-status-text');
+    const accountInfo = document.getElementById('topstep-account-info');
+    const connectBtn = document.getElementById('topstep-connect-btn');
+    const connectBtnText = document.getElementById('topstep-connect-btn-text');
+
+    if (!apiKey || !username) {
+        if (statusDiv && messageEl) {
+            statusDiv.classList.remove('hidden', 'bg-green-500/20');
+            statusDiv.classList.add('bg-red-500/20');
+            messageEl.textContent = '❌ Ingresa API Key y Username antes de conectar';
+            messageEl.className = 'text-sm text-red-500';
+        }
+        return;
+    }
+
+    // Mostrar estado de conexión
+    if (statusDiv && messageEl) {
+        statusDiv.classList.remove('hidden', 'bg-red-500/20', 'bg-green-500/20');
+        statusDiv.classList.add('bg-yellow-500/20');
+        messageEl.textContent = '🔄 Conectando a TopstepX...';
+        messageEl.className = 'text-sm text-yellow-500';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({api_key: apiKey, username: username})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Guardar estado
+            state.topstepConnected = true;
+            state.topstepApiKey = apiKey;
+            state.topstepUsername = username;
+            state.accountId = data.account_id;
+
+            // Guardar en localStorage
+            localStorage.setItem('topstep_api_key', apiKey);
+            localStorage.setItem('topstep_username', username);
+            localStorage.setItem('topstep_account_id', data.account_id || '');
+
+            // Actualizar UI
+            if (indicator) indicator.classList.remove('hidden');
+            if (statusIcon) {
+                statusIcon.classList.remove('bg-red-500', 'bg-yellow-500');
+                statusIcon.classList.add('bg-green-500');
+            }
+            if (statusText) statusText.textContent = 'Conectado';
+            if (accountInfo) accountInfo.textContent = 'Account ID: ' + (data.account_id || 'N/A');
+
+            if (connectBtn) {
+                connectBtn.classList.remove('bg-accent-cyan', 'hover:bg-cyan-600');
+                connectBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            }
+            if (connectBtnText) connectBtnText.textContent = 'Desconectar';
+
+            if (statusDiv && messageEl) {
+                statusDiv.classList.remove('hidden', 'bg-red-500/20', 'bg-yellow-500/20');
+                statusDiv.classList.add('bg-green-500/20');
+                messageEl.textContent = '✅ Conectado exitosamente a TopstepX';
+                messageEl.className = 'text-sm text-green-500';
+            }
+
+            // Actualizar header
+            const headerAccountId = document.getElementById('account-id');
+            if (headerAccountId) headerAccountId.textContent = data.account_id || 'N/A';
+
+            // Iniciar WebSocket si no está iniciado
+            if (!state.wsConnection) {
+                initWebSocket();
+            }
+
+            // Cargar datos iniciales
+            await loadInitialData();
+
+        } else {
+            if (statusDiv && messageEl) {
+                statusDiv.classList.remove('hidden', 'bg-green-500/20', 'bg-yellow-500/20');
+                statusDiv.classList.add('bg-red-500/20');
+                messageEl.textContent = '❌ Error: ' + (data.message || 'No se pudo conectar');
+                messageEl.className = 'text-sm text-red-500';
+            }
+        }
+    } catch (error) {
+        console.error('Error conectando a TopstepX:', error);
+        if (statusDiv && messageEl) {
+            statusDiv.classList.remove('hidden', 'bg-green-500/20', 'bg-yellow-500/20');
+            statusDiv.classList.add('bg-red-500/20');
+            messageEl.textContent = '❌ Error de conexión con el servidor';
+            messageEl.className = 'text-sm text-red-500';
+        }
+    }
+}
+
+async function disconnectTopstepX() {
+    const statusDiv = document.getElementById('topstep-connection-status');
+    const messageEl = document.getElementById('topstep-connection-message');
+    const indicator = document.getElementById('topstep-connection-indicator');
+    const statusIcon = document.getElementById('topstep-status-icon');
+    const statusText = document.getElementById('topstep-status-text');
+    const accountInfo = document.getElementById('topstep-account-info');
+    const connectBtn = document.getElementById('topstep-connect-btn');
+    const connectBtnText = document.getElementById('topstep-connect-btn-text');
+
+    // Actualizar estado
+    state.topstepConnected = false;
+    state.topstepApiKey = null;
+    state.topstepUsername = null;
+    state.accountId = null;
+
+    // Limpiar localStorage
+    localStorage.removeItem('topstep_api_key');
+    localStorage.removeItem('topstep_username');
+    localStorage.removeItem('topstep_account_id');
+
+    // Actualizar UI
+    if (indicator) indicator.classList.add('hidden');
+    if (statusIcon) {
+        statusIcon.classList.remove('bg-green-500', 'bg-yellow-500');
+        statusIcon.classList.add('bg-red-500');
+    }
+    if (statusText) statusText.textContent = 'Desconectado';
+    if (accountInfo) accountInfo.textContent = '';
+
+    if (connectBtn) {
+        connectBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        connectBtn.classList.add('bg-accent-cyan', 'hover:bg-cyan-600');
+    }
+    if (connectBtnText) connectBtnText.textContent = 'Conectar';
+
+    if (statusDiv && messageEl) {
+        statusDiv.classList.remove('hidden', 'bg-red-500/20', 'bg-green-500/20');
+        statusDiv.classList.add('bg-yellow-500/20');
+        messageEl.textContent = '⚠️ Desconectado de TopstepX';
+        messageEl.className = 'text-sm text-yellow-500';
+    }
+
+    // Cerrar WebSocket
+    if (state.wsConnection) {
+        state.wsConnection.close();
+        state.wsConnection = null;
+    }
+}
+
+// Cargar configuración guardada de TopstepX al iniciar
+function loadSavedTopstepConfig() {
+    const savedApiKey = localStorage.getItem('topstep_api_key');
+    const savedUsername = localStorage.getItem('topstep_username');
+    const savedAccountId = localStorage.getItem('topstep_account_id');
+
+    if (savedApiKey && savedUsername) {
+        const apiKeyInput = document.getElementById('config-api-key');
+        const usernameInput = document.getElementById('config-topstep-username');
+
+        if (apiKeyInput) apiKeyInput.value = savedApiKey;
+        if (usernameInput) usernameInput.value = savedUsername;
+
+        // Mostrar como conectado
+        state.topstepConnected = true;
+        state.topstepApiKey = savedApiKey;
+        state.topstepUsername = savedUsername;
+        state.accountId = savedAccountId;
+
+        const indicator = document.getElementById('topstep-connection-indicator');
+        const statusIcon = document.getElementById('topstep-status-icon');
+        const statusText = document.getElementById('topstep-status-text');
+        const accountInfo = document.getElementById('topstep-account-info');
+        const connectBtn = document.getElementById('topstep-connect-btn');
+        const connectBtnText = document.getElementById('topstep-connect-btn-text');
+
+        if (indicator) indicator.classList.remove('hidden');
+        if (statusIcon) {
+            statusIcon.classList.remove('bg-red-500');
+            statusIcon.classList.add('bg-green-500');
+        }
+        if (statusText) statusText.textContent = 'Conectado';
+        if (accountInfo) accountInfo.textContent = 'Account ID: ' + (savedAccountId || 'N/A');
+
+        if (connectBtn) {
+            connectBtn.classList.remove('bg-accent-cyan', 'hover:bg-cyan-600');
+            connectBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+        }
+        if (connectBtnText) connectBtnText.textContent = 'Desconectar';
+    }
 }
 
 // ============================================================================
@@ -911,6 +1130,15 @@ setInterval(async () => {
 
 // Verificar autenticación al cargar
 window.addEventListener('DOMContentLoaded', async () => {
+    // Cargar configuración guardada de TopstepX
+    loadSavedTopstepConfig();
+
+    // Cargar datos de usuario si están guardados
+    const userId = localStorage.getItem('user_id');
+    if (userId) {
+        await loadUserData();
+    }
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/auth/status`);
         const data = await response.json();

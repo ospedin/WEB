@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 color 0B
 cls
 echo ================================================================================
@@ -20,7 +21,7 @@ if not exist "backend\venv" (
 )
 
 :: Verificar que Docker esta corriendo
-echo Verificando Docker Desktop...
+echo [1/6] Verificando Docker Desktop...
 docker ps >nul 2>&1
 if %errorLevel% neq 0 (
     echo [ADVERTENCIA] Docker Desktop no esta corriendo.
@@ -42,8 +43,25 @@ if %errorLevel% neq 0 (
 echo OK - Docker esta corriendo
 echo.
 
-echo Deteniendo contenedores antiguos si existen...
+:: Limpiar puertos ocupados
+echo [2/6] Limpiando puertos ocupados...
+echo Deteniendo contenedores antiguos...
 docker-compose down 2>nul
+docker stop trading_backend trading_frontend trading_postgres trading_redis trading_prometheus trading_grafana 2>nul
+docker rm -f trading_backend trading_frontend trading_postgres trading_redis trading_prometheus trading_grafana 2>nul
+
+:: Liberar puertos del sistema
+echo Liberando puertos del sistema (8000, 3000, 5432, 6379, 9090, 3001)...
+for %%P in (8000 3000 5432 6379 9090 3001) do (
+    for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%%P ^| findstr LISTENING 2^>nul') do (
+        set PID=%%a
+        if not "!PID!"=="" (
+            echo    Liberando puerto %%P (PID: !PID!)...
+            taskkill /F /PID !PID! >nul 2>&1
+        )
+    )
+)
+echo OK - Puertos liberados
 echo.
 
 echo ================================================================================
@@ -51,12 +69,13 @@ echo    INICIANDO SERVICIOS
 echo ================================================================================
 echo.
 
-echo [1/6] PostgreSQL + TimescaleDB...
-echo [2/6] Redis...
-echo [3/6] Backend FastAPI...
-echo [4/6] Frontend Nginx...
-echo [5/6] Grafana...
-echo [6/6] Prometheus...
+echo [3/6] Iniciando contenedores Docker...
+echo    - PostgreSQL + TimescaleDB
+echo    - Redis
+echo    - Backend FastAPI
+echo    - Frontend Nginx
+echo    - Grafana
+echo    - Prometheus
 echo.
 
 docker-compose up -d
@@ -73,15 +92,59 @@ if %errorLevel% neq 0 (
 
 echo.
 echo ================================================================================
-echo Esperando que todos los servicios esten listos...
+echo [4/6] Esperando que los servicios esten listos...
 echo ================================================================================
 echo.
 
-:: Esperar 10 segundos para que los servicios inicien
-timeout /t 10 /nobreak >nul
+:: Esperar a que PostgreSQL este listo
+echo Esperando PostgreSQL...
+:wait_postgres
+timeout /t 2 /nobreak >nul
+docker exec trading_postgres pg_isready -U trading_user -d trading_db >nul 2>&1
+if %errorLevel% neq 0 (
+    echo    Esperando PostgreSQL... (reintentando)
+    goto :wait_postgres
+)
+echo OK - PostgreSQL esta listo
+echo.
 
-:: Verificar estado de servicios
-echo Verificando servicios...
+:: Esperar a que Redis este listo
+echo Esperando Redis...
+timeout /t 2 /nobreak >nul
+docker exec trading_redis redis-cli ping >nul 2>&1
+if %errorLevel% neq 0 (
+    echo    Esperando Redis... (reintentando)
+    timeout /t 2 /nobreak >nul
+)
+echo OK - Redis esta listo
+echo.
+
+:: Esperar a que el backend este listo
+echo Esperando Backend API...
+:wait_backend
+timeout /t 2 /nobreak >nul
+curl -s http://localhost:8000/docs >nul 2>&1
+if %errorLevel% neq 0 (
+    echo    Esperando Backend... (reintentando)
+    goto :wait_backend
+)
+echo OK - Backend esta listo
+echo.
+
+:: Esperar a que el frontend este listo
+echo Esperando Frontend...
+timeout /t 2 /nobreak >nul
+curl -s http://localhost:3000 >nul 2>&1
+if %errorLevel% neq 0 (
+    echo    Esperando Frontend... (reintentando)
+    timeout /t 2 /nobreak >nul
+)
+echo OK - Frontend esta listo
+echo.
+
+echo ================================================================================
+echo [5/6] Verificando estado de servicios...
+echo ================================================================================
 echo.
 
 docker-compose ps
@@ -136,12 +199,9 @@ echo.
 echo ================================================================================
 echo.
 echo ================================================================================
-echo    ABRIENDO INTERFAZ WEB...
+echo [6/6] ABRIENDO INTERFAZ WEB...
 echo ================================================================================
 echo.
-
-:: Esperar 3 segundos adicionales para que el frontend este listo
-timeout /t 3 /nobreak >nul
 
 :: Abrir navegador con la interfaz web
 echo Abriendo http://localhost:3000 en el navegador...
@@ -152,9 +212,33 @@ echo ===========================================================================
 echo    TODO LISTO! SISTEMA EN FUNCIONAMIENTO
 echo ================================================================================
 echo.
+color 0A
+echo SERVICIOS DISPONIBLES:
+echo.
+echo   [Frontend]    http://localhost:3000
+echo                 Interfaz de usuario para trading
+echo.
+echo   [Backend API] http://localhost:8000/docs
+echo                 API REST + RL + Indicadores
+echo.
+echo   [Grafana]     http://localhost:3001
+echo                 Usuario: admin / Password: admin
+echo.
+echo   [Prometheus]  http://localhost:9090
+echo                 Metricas del sistema
+echo.
+echo ================================================================================
+echo.
+echo COMANDOS UTILES:
+echo   Ver logs en tiempo real:     docker-compose logs -f
+echo   Ver logs del backend:        docker-compose logs -f backend
+echo   Estado de servicios:         docker-compose ps
+echo   Detener servicios:           detener.bat
+echo   Diagnostico:                 diagnostico.bat
+echo.
+echo ================================================================================
+echo.
 echo El sistema esta corriendo en segundo plano.
 echo Puede cerrar esta ventana sin afectar los servicios.
-echo.
-echo Para detener los servicios ejecute: detener.bat
 echo.
 pause

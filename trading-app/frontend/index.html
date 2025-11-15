@@ -540,12 +540,23 @@
                         </div>
                     </div>
 
+                    <!-- Estado de conexión -->
+                    <div id="topstep-connection-indicator" class="mb-4 p-4 rounded-lg bg-dark-bg border border-dark-border hidden">
+                        <div class="flex items-center gap-3">
+                            <div id="topstep-status-icon" class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div>
+                                <p id="topstep-status-text" class="font-medium">Desconectado</p>
+                                <p id="topstep-account-info" class="text-sm text-gray-400"></p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="flex gap-3">
                         <button onclick="testTopstepConnection()" class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition">
                             Probar Conexión
                         </button>
-                        <button onclick="saveTopstepApiKey()" class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
-                            Guardar y Conectar
+                        <button id="topstep-connect-btn" onclick="toggleTopstepConnection()" class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
+                            <span id="topstep-connect-btn-text">Conectar</span>
                         </button>
                     </div>
 
