@@ -122,5 +122,26 @@ echo   Detener todo:                detener.bat
 echo.
 echo ================================================================================
 echo.
-echo Presiona cualquier tecla para cerrar (los servicios seguiran corriendo)...
-pause >nul
+echo ================================================================================
+echo    ABRIENDO INTERFAZ WEB...
+echo ================================================================================
+echo.
+
+:: Esperar 3 segundos adicionales para que el frontend este listo
+timeout /t 3 /nobreak >nul
+
+:: Abrir navegador con la interfaz web
+echo Abriendo http://localhost:3000 en el navegador...
+start http://localhost:3000
+
+echo.
+echo ================================================================================
+echo    TODO LISTO! SISTEMA EN FUNCIONAMIENTO
+echo ================================================================================
+echo.
+echo El sistema esta corriendo en segundo plano.
+echo Puede cerrar esta ventana sin afectar los servicios.
+echo.
+echo Para detener los servicios ejecute: detener.bat
+echo.
+pause

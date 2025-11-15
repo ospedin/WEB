@@ -28,6 +28,7 @@ from db.models import (
     RLTrainingEpisode, RLAction, ContractBotConfig, ContractIndicatorConfig,
     BacktestRun
 )
+from error_handler import ErrorNotificationMiddleware, WebSocketManager
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +69,12 @@ bot_state = {
 
 # WebSocket connections
 ws_connections: List[WebSocket] = []
+
+# WebSocket Manager para notificaciones
+ws_manager = WebSocketManager()
+
+# Middleware de errores
+error_middleware = None
 
 # ============================================================================
 # MODELOS PYDANTIC
@@ -261,6 +268,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Error Notification Middleware
+error_middleware = ErrorNotificationMiddleware(app, ws_manager=ws_manager)
+app.add_middleware(ErrorNotificationMiddleware, ws_manager=ws_manager)
 
 # ============================================================================
 # FUNCIONES AUXILIARES
@@ -1253,6 +1264,7 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket para actualizaciones en tiempo real"""
     await websocket.accept()
     ws_connections.append(websocket)
+    ws_manager.add_connection(websocket)
     logger.info(f"WebSocket conectado. Total: {len(ws_connections)}")
 
     try:
@@ -1279,7 +1291,37 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         if websocket in ws_connections:
             ws_connections.remove(websocket)
+        ws_manager.remove_connection(websocket)
         logger.info(f"WebSocket desconectado. Total: {len(ws_connections)}")
+
+# ---------- LOGS Y ERRORES ----------
+
+@app.post("/api/logs/error")
+async def log_frontend_error(request: dict):
+    """Recibir logs de errores desde el frontend"""
+    try:
+        logger.error(f"[Frontend Error] {request.get('title', 'Unknown')}: {request.get('message', '')}")
+        logger.error(f"Details: {request.get('details', {})}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error procesando log de frontend: {e}")
+        return {"success": False}
+
+@app.get("/api/errors/stats")
+async def get_error_stats():
+    """Obtener estadísticas de errores del servidor"""
+    global error_middleware
+
+    if error_middleware and hasattr(error_middleware, 'get_error_stats'):
+        stats = error_middleware.get_error_stats()
+        return stats
+
+    return {
+        "total_errors": 0,
+        "by_type": {},
+        "by_level": {},
+        "recent_errors": []
+    }
 
 # ============================================================================
 # MAIN

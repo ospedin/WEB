@@ -116,12 +116,12 @@ class BacktestEngine:
             # Convertir a TopstepBar
             return [
                 TopstepBar(
+                    timestamp=bar.time,
                     open=float(bar.open),
                     high=float(bar.high),
                     low=float(bar.low),
                     close=float(bar.close),
-                    volume=int(bar.volume),
-                    time=bar.time.isoformat()
+                    volume=int(bar.volume)
                 )
                 for bar in bars_db
             ]
@@ -164,12 +164,12 @@ class BacktestEngine:
     def _create_aggregated_bar(self, bars: List[HistoricalBar], time: datetime) -> TopstepBar:
         """Crear barra agregada desde múltiples barras de 1m"""
         return TopstepBar(
+            timestamp=time,
             open=float(bars[0].open),
             high=float(max(bar.high for bar in bars)),
             low=float(min(bar.low for bar in bars)),
             close=float(bars[-1].close),
-            volume=int(sum(bar.volume for bar in bars)),
-            time=time.isoformat()
+            volume=int(sum(bar.volume for bar in bars))
         )
 
     async def _generate_bot_signal(self, bars: List[TopstepBar]) -> Optional[Dict]:
@@ -179,15 +179,33 @@ class BacktestEngine:
 
         try:
             # Crear environment temporal
+            bars_with_indicators = []
+            for bar in bars:
+                bars_with_indicators.append({
+                    'timestamp': bar.timestamp,
+                    'open': bar.open,
+                    'high': bar.high,
+                    'low': bar.low,
+                    'close': bar.close,
+                    'volume': bar.volume,
+                    'smi': 0.0, 'smi_signal': 0.0,
+                    'macd': 0.0, 'macd_signal': 0.0, 'macd_histogram': 0.0,
+                    'bb_upper': bar.close, 'bb_middle': bar.close, 'bb_lower': bar.close, 'bb_bandwidth': 0.0,
+                    'sma_fast': bar.close, 'sma_slow': bar.close,
+                    'ema_fast': bar.close, 'ema_slow': bar.close,
+                    'atr': 0.0, 'delta_volume': 0.0, 'cvd': 0.0, 'dom_imbalance': 0.0,
+                    'rsi': 50.0, 'adx': 0.0
+                })
+
             temp_env = TradingEnv(
-                bars_data=[],
-                contract_symbol=self.contract_id,
-                initial_balance=self.balance
+                bars_data=bars_with_indicators,
+                initial_capital=self.balance,
+                tick_size=self.contract.tick_size,
+                tick_value=self.contract.tick_value
             )
 
-            # Preparar observación
-            obs_data = temp_env._calculate_technical_features(bars)
-            observation = temp_env._build_observation(obs_data, bars[-1])
+            # Obtener observación del entorno
+            observation, _ = temp_env.reset()
 
             # Predecir acción
             action, _ = self.model.predict(observation, deterministic=True)
@@ -315,7 +333,7 @@ class BacktestEngine:
             'side': signal['signal'],
             'quantity': 1,
             'entry_price': current_bar.close,
-            'entry_time': current_bar.time,
+            'entry_time': current_bar.timestamp,
             'stop_loss': stop_loss,
             'take_profit': take_profit,
             'status': 'OPEN',
@@ -433,7 +451,7 @@ class BacktestEngine:
                 self._close_position(
                     position,
                     bars[-1].close,
-                    bars[-1].time,
+                    bars[-1].timestamp,
                     'END_OF_BACKTEST'
                 )
 
