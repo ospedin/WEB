@@ -96,7 +96,7 @@ echo.
 echo Esperando PostgreSQL...
 :wait_postgres
 timeout /t 2 /nobreak >nul
-docker exec trading_postgres pg_isready -U trading_user -d trading_db >nul 2>&1
+docker exec trading_postgres pg_isready -U ospedin -d trading_db >nul 2>&1
 if %errorLevel% neq 0 (
     echo    Esperando PostgreSQL... (reintentando)
     goto :wait_postgres
@@ -174,8 +174,8 @@ echo.
 echo   PostgreSQL + TimescaleDB
 echo   Host: localhost:5432
 echo   Database: trading_db
-echo   Usuario: trading_user
-echo   Password: trading_pass
+echo   Usuario: ospedin
+echo   Password: scouder
 echo.
 echo   Redis (Cache)
 echo   Host: localhost:6379

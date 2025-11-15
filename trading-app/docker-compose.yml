@@ -7,8 +7,8 @@ services:
     container_name: trading_postgres
     environment:
       POSTGRES_DB: trading_db
-      POSTGRES_USER: trading_user
-      POSTGRES_PASSWORD: trading_pass
+      POSTGRES_USER: ospedin
+      POSTGRES_PASSWORD: scouder
       POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=timescaledb"
     ports:
       - "5432:5432"
@@ -16,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading_user -d trading_db"]
+      test: ["CMD-SHELL", "pg_isready -U ospedin -d trading_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://trading_user:trading_pass@postgres:5432/trading_db
+      - DATABASE_URL=postgresql://ospedin:scouder@postgres:5432/trading_db
       - REDIS_URL=redis://redis:6379
       - PYTHONUNBUFFERED=1
       - ML_MODEL_PATH=/app/models/ppo_trading_model.zip

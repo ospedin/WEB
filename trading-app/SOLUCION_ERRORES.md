@@ -141,7 +141,7 @@ Una vez iniciado el sistema, tendrás acceso a:
 - **Backend API**: http://localhost:8000/docs
 - **Grafana**: http://localhost:3001 (admin/admin)
 - **Prometheus**: http://localhost:9090
-- **PostgreSQL**: localhost:5432
+- **PostgreSQL**: localhost:5432 (usuario: ospedin, contraseña: scouder)
 - **Redis**: localhost:6379
 
 ## Comandos Útiles
@@ -149,8 +149,41 @@ Una vez iniciado el sistema, tendrás acceso a:
 - `iniciar.bat` - Inicia todos los servicios
 - `detener.bat` - Detiene los servicios
 - `limpiar_puertos.bat` - Limpia puertos ocupados
+- `config_db.bat` - Gestión de base de datos PostgreSQL (conectar, backup, restore, etc.)
 - `diagnostico.bat` - Muestra diagnóstico del sistema
 - `ver_logs.bat` - Muestra logs en tiempo real
+
+## Gestión de Base de Datos
+
+### Nuevo Script: `config_db.bat`
+
+He creado un script completo para gestionar la base de datos PostgreSQL con tus credenciales:
+
+**Credenciales configuradas:**
+- Usuario: `ospedin`
+- Contraseña: `scouder`
+- Base de datos: `trading_db`
+- Puerto: `5432`
+
+**Funcionalidades del script:**
+
+1. **Conectar a PostgreSQL (psql)** - Abre una terminal interactiva de PostgreSQL
+2. **Ver tablas** - Muestra todas las tablas de la base de datos
+3. **Crear backup** - Genera un archivo de backup con fecha y hora
+4. **Restaurar backup** - Restaura la base de datos desde un archivo de backup
+5. **Reiniciar PostgreSQL** - Reinicia el contenedor de PostgreSQL
+6. **Ver logs** - Muestra los logs de PostgreSQL en tiempo real
+
+**Ejemplo de uso:**
+```batch
+# Ejecutar el script
+config_db.bat
+
+# Luego selecciona una opción del menú:
+# [1] Para conectarte a la base de datos
+# [3] Para crear un backup
+# etc.
+```
 
 ## Notas Importantes
 
@@ -158,9 +191,11 @@ Una vez iniciado el sistema, tendrás acceso a:
 
 2. **Docker Desktop**: Asegúrate de que Docker Desktop tenga suficientes recursos asignados (mínimo 4GB RAM recomendado).
 
-3. **Primera Ejecución**: La primera vez puede tardar más porque Docker necesita descargar las imágenes.
+3. **Primera Ejecución**: La primera vez puede tardar más porque Docker necesita descargar las imágenes. IMPORTANTE: Como se cambiaron las credenciales de PostgreSQL, es necesario eliminar el volumen anterior y crear uno nuevo.
 
 4. **Credenciales TopstepX**: Las credenciales se guardan localmente en el navegador (localStorage). Si cambias de navegador o limpias los datos, necesitarás reconectar.
+
+5. **Credenciales de Base de Datos**: Todas las credenciales de PostgreSQL han sido actualizadas a `ospedin`/`scouder`. El backend y todos los scripts usan estas credenciales automáticamente.
 
 ## Solución a Problemas Comunes
 
@@ -184,6 +219,33 @@ iniciar.bat
 2. Verifica que las credenciales sean correctas
 3. Haz clic en "Probar Conexión" primero
 4. Si el test funciona, haz clic en "Conectar"
+
+### PostgreSQL no inicia o muestra errores de autenticación
+Si cambiaste las credenciales de PostgreSQL, necesitas eliminar el volumen anterior:
+```batch
+# Opción 1: Usar detener.bat con eliminación completa
+detener.bat
+# Selecciona opción [2] para eliminar todo incluidos volúmenes
+
+# Opción 2: Comando manual
+docker-compose down -v
+docker volume rm trading-app_postgres_data
+
+# Luego inicia de nuevo
+iniciar.bat
+```
+
+### Gestionar la base de datos PostgreSQL
+Para cualquier operación administrativa de PostgreSQL:
+```batch
+config_db.bat
+```
+Este script te permite:
+- Conectarte a la base de datos
+- Ver tablas
+- Crear/restaurar backups
+- Reiniciar PostgreSQL
+- Ver logs
 
 ---
 
