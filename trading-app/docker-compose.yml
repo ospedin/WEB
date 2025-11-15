@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL con TimescaleDB para series temporales
   postgres:

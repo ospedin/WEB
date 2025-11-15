@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 color 0B
 cls
 echo ================================================================================
@@ -43,11 +44,30 @@ echo OK - Docker esta corriendo
 echo.
 
 :: Limpiar puertos ocupados
-echo [2/6] Limpiando puertos ocupados...
+echo [2/6] Limpiando puertos ocupados y volúmenes...
 echo Deteniendo contenedores antiguos...
 docker-compose down 2>nul
 docker stop trading_backend trading_frontend trading_postgres trading_redis trading_prometheus trading_grafana 2>nul
 docker rm -f trading_backend trading_frontend trading_postgres trading_redis trading_prometheus trading_grafana 2>nul
+
+:: Verificar si hay volúmenes de PostgreSQL con credenciales antiguas
+echo Verificando volúmenes de PostgreSQL...
+docker volume inspect trading-app_postgres_data >nul 2>&1
+if %errorLevel% equ 0 (
+    echo ADVERTENCIA: Se detectó un volumen de PostgreSQL existente.
+    echo Este volumen puede tener credenciales antiguas y causar errores.
+    echo.
+    set /p delete_volumes="¿Deseas eliminar el volumen de PostgreSQL? (S/N): "
+    if /i "!delete_volumes!"=="S" (
+        echo Eliminando volumen de PostgreSQL...
+        docker-compose down -v 2>nul
+        docker volume rm trading-app_postgres_data 2>nul
+        echo OK - Volumen eliminado
+    ) else (
+        echo ADVERTENCIA: Si PostgreSQL falla, ejecuta: detener.bat y selecciona opcion [2]
+    )
+    echo.
+)
 
 :: Liberar puertos del sistema
 echo Liberando puertos del sistema (8000, 3000, 5432, 6379, 9090, 3001)...

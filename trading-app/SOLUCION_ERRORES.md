@@ -148,6 +148,7 @@ Una vez iniciado el sistema, tendrás acceso a:
 
 - `iniciar.bat` - Inicia todos los servicios
 - `detener.bat` - Detiene los servicios
+- `reset_postgres.bat` - **NUEVO** - Resetea PostgreSQL eliminando volúmenes (útil tras cambiar credenciales)
 - `limpiar_puertos.bat` - Limpia puertos ocupados
 - `config_db.bat` - Gestión de base de datos PostgreSQL (conectar, backup, restore, etc.)
 - `diagnostico.bat` - Muestra diagnóstico del sistema
@@ -220,14 +221,31 @@ iniciar.bat
 3. Haz clic en "Probar Conexión" primero
 4. Si el test funciona, haz clic en "Conectar"
 
-### PostgreSQL no inicia o muestra errores de autenticación
-Si cambiaste las credenciales de PostgreSQL, necesitas eliminar el volumen anterior:
+### PostgreSQL falla con "dependency failed to start: container trading_postgres exited (1)"
+
+Este error ocurre cuando hay un volumen de PostgreSQL con credenciales antiguas.
+
+**Solución RÁPIDA (RECOMENDADA):**
 ```batch
-# Opción 1: Usar detener.bat con eliminación completa
+# Ejecuta el script de reset
+reset_postgres.bat
+# Escribe "S" para confirmar
+
+# Luego inicia normalmente
+iniciar.bat
+```
+
+**Solución alternativa con iniciar.bat:**
+Cuando ejecutes `iniciar.bat`, te preguntará si quieres eliminar el volumen de PostgreSQL.
+Responde "S" para eliminarlo y continuar.
+
+**Solución manual:**
+```batch
+# Detener todo y eliminar volúmenes
 detener.bat
 # Selecciona opción [2] para eliminar todo incluidos volúmenes
 
-# Opción 2: Comando manual
+# O manualmente:
 docker-compose down -v
 docker volume rm trading-app_postgres_data
 
