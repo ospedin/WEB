@@ -66,9 +66,12 @@ class BacktestEngine:
         # Estado del backtest
         self.positions: List[Dict] = []
         self.trades: List[Dict] = []
-        self.balance = 100000.0  # Balance inicial
+        self.initial_balance = 100000.0  # Balance inicial
+        self.balance = self.initial_balance
         self.peak_balance = self.balance
         self.max_drawdown = 0.0
+        # Curva de capital: lista de {timestamp, balance}
+        self.equity_curve: List[Dict] = []
 
     def _load_contract(self) -> Contract:
         """Cargar información del contrato"""
@@ -216,9 +219,16 @@ class BacktestEngine:
             else:
                 signal = 'NEUTRAL'
 
+            # Calcular confidence basado en la certeza del modelo
+            confidence = 0.75  # Base confidence para RL
+            if signal != 'NEUTRAL':
+                # Ajustar confidence basado en el tamaño de posición (mayor posición = mayor confianza)
+                position_size = float(decoded_action['position_size'][0])
+                confidence = min(0.95, 0.70 + (position_size * 0.25))
+
             return {
                 'signal': signal,
-                'confidence': 0.75,  # Placeholder
+                'confidence': confidence,
                 'source': 'RL_MODEL',
                 'position_size': float(decoded_action['position_size'][0]),
                 'sl_multiplier': float(decoded_action['sl_multiplier'][0]),
@@ -409,6 +419,13 @@ class BacktestEngine:
         self.trades.append(trade)
         self.balance += pnl
 
+        # Registrar punto en la curva de capital
+        self.equity_curve.append({
+            'timestamp': exit_time if isinstance(exit_time, str) else exit_time.isoformat(),
+            'balance': self.balance,
+            'pnl': pnl
+        })
+
         # Actualizar drawdown
         if self.balance > self.peak_balance:
             self.peak_balance = self.balance
@@ -434,6 +451,13 @@ class BacktestEngine:
 
         logger.info(f"Cargadas {len(bars)} barras de {main_timeframe}m")
 
+        # Registrar punto inicial de la curva de capital
+        self.equity_curve.append({
+            'timestamp': bars[0].timestamp.isoformat() if hasattr(bars[0].timestamp, 'isoformat') else str(bars[0].timestamp),
+            'balance': self.initial_balance,
+            'pnl': 0.0
+        })
+
         # Ventana para análisis (necesitamos suficientes barras para indicadores)
         window_size = 100
 
@@ -448,7 +472,13 @@ class BacktestEngine:
             self._check_position_exits(current_bar)
 
             # Abrir nueva posición si hay señal
-            min_confidence = self.indicator_config.min_confidence if self.indicator_config else 0.70
+            # Usar min_confidence de indicator_config si existe, sino de bot_config, sino valor por defecto
+            min_confidence = 0.70  # Valor por defecto
+            if self.indicator_config and hasattr(self.indicator_config, 'min_confidence'):
+                min_confidence = self.indicator_config.min_confidence
+            elif self.bot_config and hasattr(self.bot_config, 'min_confidence'):
+                min_confidence = self.bot_config.min_confidence
+
             if signal['confidence'] >= min_confidence:
                 self._open_position(signal, current_bar)
 
@@ -534,8 +564,10 @@ class BacktestEngine:
             'win_rate': win_rate,
             'profit_factor': profit_factor,
             'max_drawdown': self.max_drawdown,
+            'initial_balance': self.initial_balance,
             'final_balance': self.balance,
-            'trades': serialized_trades
+            'trades': serialized_trades,
+            'equity_curve': self.equity_curve
         }
 
     def _prepare_chart_data(self, bars: List[TopstepBar]) -> Dict:
@@ -593,6 +625,66 @@ class BacktestEngine:
                                for i in range(len(bars))],
                     'histogram': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(macd_result.histogram[i])}
                                   for i in range(len(bars))]
+                }
+
+            # Bollinger Bands
+            if self.indicator_config.use_bb:
+                bb_result = TechnicalIndicators.calculate_bollinger_bands(bars)
+                indicators['bollinger_bands'] = {
+                    'upper': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(bb_result.upper[i])}
+                              for i in range(len(bars))],
+                    'middle': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(bb_result.middle[i])}
+                               for i in range(len(bars))],
+                    'lower': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(bb_result.lower[i])}
+                              for i in range(len(bars))]
+                }
+
+            # Moving Averages
+            if self.indicator_config.use_ma:
+                ma_result = TechnicalIndicators.calculate_moving_averages(bars)
+                indicators['moving_averages'] = {
+                    'sma_fast': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(ma_result.sma_fast[i])}
+                                 for i in range(len(bars))],
+                    'sma_slow': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(ma_result.sma_slow[i])}
+                                 for i in range(len(bars))],
+                    'ema_fast': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(ma_result.ema_fast[i])}
+                                 for i in range(len(bars))],
+                    'ema_slow': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(ma_result.ema_slow[i])}
+                                 for i in range(len(bars))]
+                }
+
+            # VWAP
+            if self.indicator_config.use_vwap:
+                vwap_result = TechnicalIndicators.calculate_vwap(bars)
+                indicators['vwap'] = {
+                    'vwap': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(vwap_result.vwap[i])}
+                             for i in range(len(bars))],
+                    'upper_band': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(vwap_result.upper_band[i])}
+                                   for i in range(len(bars))],
+                    'lower_band': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(vwap_result.lower_band[i])}
+                                   for i in range(len(bars))]
+                }
+
+            # SuperTrend
+            if self.indicator_config.use_supertrend:
+                supertrend_result = TechnicalIndicators.calculate_supertrend(bars)
+                indicators['supertrend'] = {
+                    'supertrend': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(supertrend_result.supertrend[i])}
+                                   for i in range(len(bars))],
+                    'direction': [{'time': int(bars[i].timestamp.timestamp()), 'value': int(supertrend_result.direction[i])}
+                                  for i in range(len(bars))]
+                }
+
+            # KDJ
+            if self.indicator_config.use_kdj:
+                kdj_result = TechnicalIndicators.calculate_kdj(bars)
+                indicators['kdj'] = {
+                    'k': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(kdj_result.k[i])}
+                          for i in range(len(bars))],
+                    'd': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(kdj_result.d[i])}
+                          for i in range(len(bars))],
+                    'j': [{'time': int(bars[i].timestamp.timestamp()), 'value': float(kdj_result.j[i])}
+                          for i in range(len(bars))]
                 }
 
         return {

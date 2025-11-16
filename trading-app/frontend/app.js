@@ -1041,26 +1041,6 @@ async function executeBacktest() {
         mode = 'indicators_only';
     }
 
-    // Verificar indicadores si es necesario
-    const selectedIndicators = [];
-    ['smi', 'stochrsi', 'macd', 'bb', 'kdj', 'ma', 'cci', 'roc', 'atr', 'wr'].forEach(indicator => {
-        const checkbox = document.getElementById(`use-${indicator}`);
-        if (checkbox && checkbox.checked) {
-            selectedIndicators.push(indicator);
-        }
-    });
-
-    if (currentBacktestMode !== 'model' && selectedIndicators.length === 0) {
-        if (window.errorNotificationSystem) {
-            window.errorNotificationSystem.notify(
-                '⚠️ Indicadores requeridos',
-                'Selecciona al menos un indicador técnico',
-                'warning'
-            );
-        }
-        return;
-    }
-
     // Obtener parámetros adicionales
     const timeframe = parseInt(document.getElementById('backtest-timeframe').value);
     const stopLoss = parseFloat(document.getElementById('backtest-stop-loss').value) || 150;
@@ -1074,6 +1054,34 @@ async function executeBacktest() {
     const smiOverbought = parseFloat(document.getElementById('smi-overbought')?.value) || 40;
     const stochRsiOversold = parseFloat(document.getElementById('stochrsi-oversold')?.value) || 20;
     const stochRsiOverbought = parseFloat(document.getElementById('stochrsi-overbought')?.value) || 80;
+    const minConfidence = parseFloat(document.getElementById('backtest-min-confidence')?.value) || 0.70;
+
+    // Obtener indicadores seleccionados
+    const useSmi = document.getElementById('use-smi')?.checked || false;
+    const useMacd = document.getElementById('use-macd')?.checked || false;
+    const useBb = document.getElementById('use-bb')?.checked || false;
+    const useMa = document.getElementById('use-ma')?.checked || false;
+    const useStochRsi = document.getElementById('use-stochrsi')?.checked || false;
+    const useVwap = document.getElementById('use-vwap')?.checked || false;
+    const useSupertrend = document.getElementById('use-supertrend')?.checked || false;
+    const useKdj = document.getElementById('use-kdj')?.checked || false;
+    const useCci = document.getElementById('use-cci')?.checked || false;
+    const useRoc = document.getElementById('use-roc')?.checked || false;
+    const useAtr = document.getElementById('use-atr')?.checked || false;
+    const useWr = document.getElementById('use-wr')?.checked || false;
+
+    // Verificar que al menos un indicador esté seleccionado si no es modo "model"
+    const hasAnyIndicator = useSmi || useMacd || useBb || useMa || useStochRsi || useVwap || useSupertrend || useKdj;
+    if (currentBacktestMode !== 'model' && !hasAnyIndicator) {
+        if (window.errorNotificationSystem) {
+            window.errorNotificationSystem.notify(
+                '⚠️ Indicadores requeridos',
+                'Selecciona al menos un indicador técnico',
+                'warning'
+            );
+        }
+        return;
+    }
 
     // Configuración del backtest según el backend requiere
     const backtestConfig = {
@@ -1088,7 +1096,21 @@ async function executeBacktest() {
         smi_oversold: smiOversold,
         smi_overbought: smiOverbought,
         stoch_rsi_oversold: stochRsiOversold,
-        stoch_rsi_overbought: stochRsiOverbought
+        stoch_rsi_overbought: stochRsiOverbought,
+        min_confidence: minConfidence,
+        // Indicadores seleccionados
+        use_smi: useSmi,
+        use_macd: useMacd,
+        use_bb: useBb,
+        use_ma: useMa,
+        use_stoch_rsi: useStochRsi,
+        use_vwap: useVwap,
+        use_supertrend: useSupertrend,
+        use_kdj: useKdj,
+        use_cci: useCci,
+        use_roc: useRoc,
+        use_atr: useAtr,
+        use_wr: useWr
     }
 
     try {
@@ -1216,14 +1238,23 @@ function displayBacktestResults(data) {
     // Renderizar gráfico de velas con indicadores
     if (results.chart_data && results.chart_data.candlesticks && results.chart_data.candlesticks.length > 0) {
         document.getElementById('candlestick-chart-container').classList.remove('hidden');
-        renderBacktestChart(results.chart_data, results.trades || []);
+        renderBacktestChart(results.chart_data, results.trades || [], results.equity_curve || []);
     } else {
         document.getElementById('candlestick-chart-container').classList.add('hidden');
+    }
+
+    // Renderizar curva de capital
+    if (results.equity_curve && results.equity_curve.length > 0) {
+        document.getElementById('equity-curve-container')?.classList.remove('hidden');
+        renderEquityCurve(results.equity_curve, results.initial_balance || 100000);
+    } else {
+        document.getElementById('equity-curve-container')?.classList.add('hidden');
     }
 
     console.log('✅ Resultados del backtest mostrados:', {
         trades: results.trades?.length || 0,
         candlesticks: results.chart_data?.candlesticks?.length || 0,
+        equity_points: results.equity_curve?.length || 0,
         pnl: totalPnl,
         winRate: winRate
     });
@@ -2727,7 +2758,87 @@ let backtestCandleSeries = null;
 let backtestIndicatorSeries = {};
 let backtestMarkers = [];
 
-function renderBacktestChart(chartData, trades) {
+// Variables globales para gráficos
+let equityChart = null;
+let equityLineSeries = null;
+
+function renderEquityCurve(equityCurve, initialBalance) {
+    const container = document.getElementById('equity-curve-chart');
+
+    // Limpiar gráfico anterior si existe
+    if (equityChart) {
+        equityChart.remove();
+        equityChart = null;
+        equityLineSeries = null;
+    }
+
+    // Crear gráfico de curva de capital
+    equityChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 300,
+        layout: {
+            background: { color: '#0f172a' },
+            textColor: '#d1d5db',
+        },
+        grid: {
+            vertLines: { color: '#1e293b' },
+            horzLines: { color: '#1e293b' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: '#334155',
+        },
+        timeScale: {
+            borderColor: '#334155',
+            timeVisible: true,
+            secondsVisible: false,
+        },
+    });
+
+    // Preparar datos de la curva de capital
+    const equityData = equityCurve.map(point => ({
+        time: new Date(point.timestamp).getTime() / 1000,
+        value: point.balance
+    }));
+
+    // Agregar serie de línea para la curva de capital
+    equityLineSeries = equityChart.addLineSeries({
+        color: '#3b82f6',
+        lineWidth: 2,
+        title: 'Balance',
+    });
+    equityLineSeries.setData(equityData);
+
+    // Añadir línea de balance inicial (referencia)
+    const initialBalanceLine = equityChart.addLineSeries({
+        color: '#64748b',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        title: 'Balance Inicial',
+        priceLineVisible: false,
+        lastValueVisible: false,
+    });
+    initialBalanceLine.setData([
+        { time: equityData[0].time, value: initialBalance },
+        { time: equityData[equityData.length - 1].time, value: initialBalance }
+    ]);
+
+    // Ajustar zoom
+    equityChart.timeScale().fitContent();
+
+    // Hacer responsive
+    window.addEventListener('resize', () => {
+        if (equityChart && container) {
+            equityChart.applyOptions({ width: container.clientWidth });
+        }
+    });
+
+    console.log(`✅ Curva de capital renderizada con ${equityData.length} puntos`);
+}
+
+function renderBacktestChart(chartData, trades, equityCurve) {
     const container = document.getElementById('candlestick-chart');
 
     // Limpiar gráfico anterior si existe
@@ -2979,6 +3090,130 @@ function renderIndicators(indicators) {
                 color: d.value >= 0 ? '#22c55e' : '#ef4444'
             }))
         );
+    }
+
+    // Bollinger Bands (overlay en el gráfico principal)
+    if (indicators.bollinger_bands) {
+        backtestIndicatorSeries.bb_upper = backtestChart.addLineSeries({
+            color: '#f59e0b',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'BB Upper',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.bb_upper.setData(indicators.bollinger_bands.upper);
+
+        backtestIndicatorSeries.bb_middle = backtestChart.addLineSeries({
+            color: '#64748b',
+            lineWidth: 1,
+            title: 'BB Middle',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.bb_middle.setData(indicators.bollinger_bands.middle);
+
+        backtestIndicatorSeries.bb_lower = backtestChart.addLineSeries({
+            color: '#f59e0b',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'BB Lower',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.bb_lower.setData(indicators.bollinger_bands.lower);
+    }
+
+    // Moving Averages (overlay en el gráfico principal)
+    if (indicators.moving_averages) {
+        backtestIndicatorSeries.sma_fast = backtestChart.addLineSeries({
+            color: '#22c55e',
+            lineWidth: 1,
+            title: 'SMA Fast',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.sma_fast.setData(indicators.moving_averages.sma_fast);
+
+        backtestIndicatorSeries.sma_slow = backtestChart.addLineSeries({
+            color: '#ef4444',
+            lineWidth: 1,
+            title: 'SMA Slow',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.sma_slow.setData(indicators.moving_averages.sma_slow);
+    }
+
+    // VWAP (overlay en el gráfico principal)
+    if (indicators.vwap) {
+        backtestIndicatorSeries.vwap = backtestChart.addLineSeries({
+            color: '#8b5cf6',
+            lineWidth: 2,
+            title: 'VWAP',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.vwap.setData(indicators.vwap.vwap);
+
+        backtestIndicatorSeries.vwap_upper = backtestChart.addLineSeries({
+            color: '#a78bfa',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            title: 'VWAP Upper',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.vwap_upper.setData(indicators.vwap.upper_band);
+
+        backtestIndicatorSeries.vwap_lower = backtestChart.addLineSeries({
+            color: '#a78bfa',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dotted,
+            title: 'VWAP Lower',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.vwap_lower.setData(indicators.vwap.lower_band);
+    }
+
+    // SuperTrend (overlay en el gráfico principal)
+    if (indicators.supertrend) {
+        backtestIndicatorSeries.supertrend = backtestChart.addLineSeries({
+            color: '#06b6d4',
+            lineWidth: 2,
+            title: 'SuperTrend',
+            priceLineVisible: false,
+            lastValueVisible: false,
+        });
+        backtestIndicatorSeries.supertrend.setData(indicators.supertrend.supertrend);
+    }
+
+    // KDJ (panel separado)
+    if (indicators.kdj) {
+        const kdjPane = backtestChart.addPane({ height: 150 });
+
+        backtestIndicatorSeries.kdj_k = kdjPane.addLineSeries({
+            color: '#22c55e',
+            lineWidth: 2,
+            title: 'KDJ K',
+        });
+        backtestIndicatorSeries.kdj_k.setData(indicators.kdj.k);
+
+        backtestIndicatorSeries.kdj_d = kdjPane.addLineSeries({
+            color: '#ef4444',
+            lineWidth: 1,
+            title: 'KDJ D',
+        });
+        backtestIndicatorSeries.kdj_d.setData(indicators.kdj.d);
+
+        backtestIndicatorSeries.kdj_j = kdjPane.addLineSeries({
+            color: '#3b82f6',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'KDJ J',
+        });
+        backtestIndicatorSeries.kdj_j.setData(indicators.kdj.j);
     }
 }
 

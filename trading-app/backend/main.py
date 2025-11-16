@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 import redis.asyncio as redis
 from sqlalchemy import create_engine, select, update, delete, and_, desc
 from sqlalchemy.orm import Session, sessionmaker
@@ -157,6 +157,8 @@ class TradingScheduleRequest(BaseModel):
     end_time: str = Field(..., pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
 
 class BacktestRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     contract_id: str
     mode: str = Field(..., pattern="^(bot_only|bot_indicators|indicators_only)$")
     timeframes: List[int] = Field(..., min_items=1)  # [1, 5, 15] minutos
@@ -173,8 +175,24 @@ class BacktestRequest(BaseModel):
     smi_overbought: Optional[float] = 40.0
     stoch_rsi_oversold: Optional[float] = 20.0
     stoch_rsi_overbought: Optional[float] = 80.0
+    # Indicadores seleccionados por el usuario
+    use_smi: Optional[bool] = False
+    use_macd: Optional[bool] = False
+    use_bb: Optional[bool] = False
+    use_ma: Optional[bool] = False
+    use_stoch_rsi: Optional[bool] = False
+    use_vwap: Optional[bool] = False
+    use_supertrend: Optional[bool] = False
+    use_kdj: Optional[bool] = False
+    use_cci: Optional[bool] = False
+    use_roc: Optional[bool] = False
+    use_atr: Optional[bool] = False
+    use_wr: Optional[bool] = False
+    min_confidence: Optional[float] = 0.70
 
 class ContractBotConfigRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     contract_id: str
     name: str = "Default Contract Config"
     stop_loss_usd: float = 150.0
@@ -1343,27 +1361,46 @@ async def run_backtest(request: BacktestRequest, background_tasks: BackgroundTas
             ).first()
 
             if existing_config:
-                # Actualizar con los valores del usuario
+                # Actualizar con los valores e indicadores seleccionados por el usuario
+                existing_config.use_smi = request.use_smi
+                existing_config.use_macd = request.use_macd
+                existing_config.use_bb = request.use_bb
+                existing_config.use_ma = request.use_ma
+                existing_config.use_stoch_rsi = request.use_stoch_rsi
+                existing_config.use_vwap = request.use_vwap
+                existing_config.use_supertrend = request.use_supertrend
+                existing_config.use_kdj = request.use_kdj
                 existing_config.smi_oversold = request.smi_oversold
                 existing_config.smi_overbought = request.smi_overbought
                 existing_config.stoch_rsi_oversold = request.stoch_rsi_oversold
                 existing_config.stoch_rsi_overbought = request.stoch_rsi_overbought
+                existing_config.min_confidence = request.min_confidence
+                existing_config.timeframe_minutes = request.timeframes[0]
                 db.commit()
                 indicator_config_id = existing_config.id
-                logger.info(f"✅ Config actualizado: SMI({request.smi_oversold}/{request.smi_overbought}), StochRSI({request.stoch_rsi_oversold}/{request.stoch_rsi_overbought})")
+                # Contar indicadores activos
+                active_indicators = [
+                    name for name, enabled in [
+                        ('SMI', request.use_smi), ('MACD', request.use_macd), ('BB', request.use_bb),
+                        ('MA', request.use_ma), ('StochRSI', request.use_stoch_rsi), ('VWAP', request.use_vwap),
+                        ('SuperTrend', request.use_supertrend), ('KDJ', request.use_kdj)
+                    ] if enabled
+                ]
+                logger.info(f"✅ Config actualizado con indicadores: {', '.join(active_indicators) if active_indicators else 'NINGUNO'}")
             else:
-                # Crear configuración predeterminada con valores del usuario
+                # Crear configuración con indicadores seleccionados por el usuario
                 default_config = ContractIndicatorConfig(
                     contract_id=request.contract_id,
                     name=f"Backtest_{request.contract_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    use_smi=True,
-                    use_macd=True,
-                    use_bb=True,
-                    use_ma=True,
-                    use_stoch_rsi=True,
-                    use_vwap=False,
-                    use_supertrend=False,
-                    use_kdj=False,
+                    # Usar indicadores seleccionados por el usuario
+                    use_smi=request.use_smi,
+                    use_macd=request.use_macd,
+                    use_bb=request.use_bb,
+                    use_ma=request.use_ma,
+                    use_stoch_rsi=request.use_stoch_rsi,
+                    use_vwap=request.use_vwap,
+                    use_supertrend=request.use_supertrend,
+                    use_kdj=request.use_kdj,
                     # Parámetros SMI
                     smi_k_length=8,
                     smi_d_smoothing=3,
@@ -1390,13 +1427,21 @@ async def run_backtest(request: BacktestRequest, background_tasks: BackgroundTas
                     stoch_rsi_oversold=request.stoch_rsi_oversold,
                     stoch_rsi_overbought=request.stoch_rsi_overbought,
                     # Configuración general
-                    timeframe_minutes=5,
-                    min_confidence=0.70
+                    timeframe_minutes=request.timeframes[0],
+                    min_confidence=request.min_confidence
                 )
                 db.add(default_config)
                 db.commit()
                 indicator_config_id = default_config.id
-                logger.info(f"✅ Configuración de indicadores creada con SMI({request.smi_oversold}/{request.smi_overbought}), StochRSI({request.stoch_rsi_oversold}/{request.stoch_rsi_overbought})")
+                # Contar indicadores activos
+                active_indicators = [
+                    name for name, enabled in [
+                        ('SMI', request.use_smi), ('MACD', request.use_macd), ('BB', request.use_bb),
+                        ('MA', request.use_ma), ('StochRSI', request.use_stoch_rsi), ('VWAP', request.use_vwap),
+                        ('SuperTrend', request.use_supertrend), ('KDJ', request.use_kdj)
+                    ] if enabled
+                ]
+                logger.info(f"✅ Configuración creada con indicadores: {', '.join(active_indicators) if active_indicators else 'NINGUNO'}")
 
         # Crear o actualizar bot_config con parámetros de riesgo del usuario
         bot_config_id = request.bot_config_id
@@ -1461,8 +1506,10 @@ async def run_backtest(request: BacktestRequest, background_tasks: BackgroundTas
                 "win_rate": results['win_rate'],
                 "profit_factor": results['profit_factor'],
                 "max_drawdown": results['max_drawdown'],
+                "initial_balance": results.get('initial_balance', 100000.0),
                 "final_balance": results['final_balance'],
                 "trades": results.get('trades', []),
+                "equity_curve": results.get('equity_curve', []),
                 "chart_data": results.get('chart_data', {'candlesticks': [], 'indicators': {}}),
                 "contract_info": results.get('contract_info', {})
             }
