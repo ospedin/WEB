@@ -2305,14 +2305,19 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.remove_connection(websocket)
         logger.info(f"WebSocket desconectado. Total: {len(ws_connections)}")
 
+class ErrorLogRequest(BaseModel):
+    title: Optional[str] = "Unknown Error"
+    message: Optional[str] = ""
+    details: Optional[Dict] = {}
+
 # ---------- LOGS Y ERRORES ----------
 
 @app.post("/api/logs/error")
-async def log_frontend_error(request: dict):
+async def log_frontend_error(request: ErrorLogRequest):
     """Recibir logs de errores desde el frontend"""
     try:
-        logger.error(f"[Frontend Error] {request.get('title', 'Unknown')}: {request.get('message', '')}")
-        logger.error(f"Details: {request.get('details', {})}")
+        logger.error(f"[Frontend Error] {request.title}: {request.message}")
+        logger.error(f"Details: {request.details}")
         return {"success": True}
     except Exception as e:
         logger.error(f"Error procesando log de frontend: {e}")

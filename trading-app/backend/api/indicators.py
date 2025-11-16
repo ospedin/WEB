@@ -496,16 +496,35 @@ class TechnicalIndicators:
                 'overbought': float(smi_overbought)
             }
 
-            # LONG: Cruce alcista desde zona de sobreventa
+            # LONG: Cruce alcista en zona de sobreventa (más permisivo)
+            # Opción 1: Cruce desde zona extrema (muy fuerte)
             if prev_smi <= prev_signal and current_smi > current_signal and prev_smi < smi_oversold:
                 signals.append('LONG')
-                confidences.append(min(0.90, 0.75 + abs(prev_smi - smi_oversold) / (abs(smi_oversold) + abs(smi_overbought)) * 0.15))
-                reasons.append(f'SMI cruce alcista desde sobreventa ({current_smi:.1f} < {smi_oversold})')
-            # SHORT: Cruce bajista desde zona de sobrecompra
-            elif prev_smi >= prev_signal and current_smi < current_signal and prev_smi > smi_overbought:
+                confidences.append(min(0.90, 0.85 + abs(prev_smi - smi_oversold) / (abs(smi_oversold) + abs(smi_overbought)) * 0.10))
+                reasons.append(f'SMI cruce alcista FUERTE desde sobreventa ({prev_smi:.1f} < {smi_oversold})')
+            # Opción 2: Cruce en zona de sobreventa (normal)
+            elif prev_smi <= prev_signal and current_smi > current_signal and current_smi < 0:
+                signals.append('LONG')
+                # Confidence basada en qué tan cerca está del oversold
+                distance_to_oversold = abs(current_smi - smi_oversold) / abs(smi_oversold)
+                confidence = max(0.65, 0.80 - (distance_to_oversold * 0.15))
+                confidences.append(confidence)
+                reasons.append(f'SMI cruce alcista ({prev_smi:.1f} → {current_smi:.1f})')
+
+            # SHORT: Cruce bajista en zona de sobrecompra (más permisivo)
+            # Opción 1: Cruce desde zona extrema (muy fuerte)
+            if prev_smi >= prev_signal and current_smi < current_signal and prev_smi > smi_overbought:
                 signals.append('SHORT')
-                confidences.append(min(0.90, 0.75 + abs(prev_smi - smi_overbought) / (abs(smi_oversold) + abs(smi_overbought)) * 0.15))
-                reasons.append(f'SMI cruce bajista desde sobrecompra ({current_smi:.1f} > {smi_overbought})')
+                confidences.append(min(0.90, 0.85 + abs(prev_smi - smi_overbought) / (abs(smi_oversold) + abs(smi_overbought)) * 0.10))
+                reasons.append(f'SMI cruce bajista FUERTE desde sobrecompra ({prev_smi:.1f} > {smi_overbought})')
+            # Opción 2: Cruce en zona de sobrecompra (normal)
+            elif prev_smi >= prev_signal and current_smi < current_signal and current_smi > 0:
+                signals.append('SHORT')
+                # Confidence basada en qué tan cerca está del overbought
+                distance_to_overbought = abs(current_smi - smi_overbought) / abs(smi_overbought)
+                confidence = max(0.65, 0.80 - (distance_to_overbought * 0.15))
+                confidences.append(confidence)
+                reasons.append(f'SMI cruce bajista ({prev_smi:.1f} → {current_smi:.1f})')
 
         # MACD
         if use_macd:
