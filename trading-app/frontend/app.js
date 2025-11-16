@@ -3230,5 +3230,118 @@ function toggleIndicator(indicatorName) {
     }
 }
 
+// ============================================================================
+// TEMA CLARO/OSCURO
+// ============================================================================
+
+function setTheme(theme) {
+    const body = document.body;
+
+    // Guardar tema seleccionado
+    localStorage.setItem('theme', theme);
+
+    // Eliminar todas las clases de tema
+    body.classList.remove('theme-light', 'theme-dark');
+
+    // Determinar tema a aplicar
+    let themeToApply = theme;
+    if (theme === 'system') {
+        // Detectar preferencia del sistema
+        themeToApply = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    // Aplicar tema
+    if (themeToApply === 'light') {
+        body.classList.add('theme-light');
+        body.style.backgroundColor = '#f8fafc';
+        body.style.color = '#1e293b';
+    } else {
+        body.classList.add('theme-dark');
+        body.style.backgroundColor = '#0f172a';
+        body.style.color = '#ffffff';
+    }
+
+    // Actualizar botones
+    ['light', 'dark', 'system'].forEach(t => {
+        const btn = document.getElementById(`theme-${t}`);
+        if (btn) {
+            if (t === theme) {
+                btn.classList.remove('border-dark-border');
+                btn.classList.add('border-accent-cyan');
+            } else {
+                btn.classList.remove('border-accent-cyan');
+                btn.classList.add('border-dark-border');
+            }
+        }
+    });
+
+    // Actualizar gráficos si existen
+    updateChartsTheme(themeToApply);
+
+    console.log(`✅ Tema cambiado a: ${theme} (aplicado: ${themeToApply})`);
+
+    if (window.errorNotificationSystem) {
+        window.errorNotificationSystem.notify(
+            '🎨 Tema actualizado',
+            `Tema ${theme === 'light' ? 'claro' : theme === 'dark' ? 'oscuro' : 'del sistema'} aplicado correctamente`,
+            'success'
+        );
+    }
+}
+
+function updateChartsTheme(theme) {
+    const isDark = theme === 'dark';
+    const bgColor = isDark ? '#0f172a' : '#ffffff';
+    const textColor = isDark ? '#d1d5db' : '#1e293b';
+    const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+    const borderColor = isDark ? '#334155' : '#cbd5e1';
+
+    // Actualizar gráfico de backtest si existe
+    if (backtestChart) {
+        backtestChart.applyOptions({
+            layout: {
+                background: { color: bgColor },
+                textColor: textColor,
+            },
+            grid: {
+                vertLines: { color: gridColor },
+                horzLines: { color: gridColor },
+            },
+            rightPriceScale: {
+                borderColor: borderColor,
+            },
+            timeScale: {
+                borderColor: borderColor,
+            },
+        });
+    }
+
+    // Actualizar gráfico de equity curve si existe
+    if (equityChart) {
+        equityChart.applyOptions({
+            layout: {
+                background: { color: bgColor },
+                textColor: textColor,
+            },
+            grid: {
+                vertLines: { color: gridColor },
+                horzLines: { color: gridColor },
+            },
+            rightPriceScale: {
+                borderColor: borderColor,
+            },
+            timeScale: {
+                borderColor: borderColor,
+            },
+        });
+    }
+}
+
+// Cargar tema guardado al iniciar
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+});
+
 console.log('🚀 AI Trading App initialized');
 console.log('📡 Backend:', API_BASE_URL);

@@ -31,6 +31,65 @@
         body { font-family: 'Inter', sans-serif; }
         .module-hidden { display: none !important; }
         .nav-active { background-color: #06b6d4; color: white; }
+
+        /* Tema Claro */
+        body.theme-light {
+            background-color: #f8fafc !important;
+            color: #1e293b !important;
+        }
+
+        body.theme-light .bg-dark-bg {
+            background-color: #ffffff !important;
+        }
+
+        body.theme-light .bg-dark-card {
+            background-color: #f1f5f9 !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        body.theme-light .border-dark-border {
+            border-color: #cbd5e1 !important;
+        }
+
+        body.theme-light .text-white {
+            color: #1e293b !important;
+        }
+
+        body.theme-light .text-gray-400 {
+            color: #64748b !important;
+        }
+
+        body.theme-light .text-gray-300 {
+            color: #475569 !important;
+        }
+
+        body.theme-light input,
+        body.theme-light select,
+        body.theme-light textarea {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        body.theme-light input:focus,
+        body.theme-light select:focus,
+        body.theme-light textarea:focus {
+            border-color: #06b6d4 !important;
+        }
+
+        body.theme-light button:not(.bg-accent-cyan):not(.nav-active) {
+            color: #1e293b !important;
+        }
+
+        body.theme-light .bg-gradient-to-br {
+            background: linear-gradient(to bottom right, rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1)) !important;
+        }
+
+        /* Mantener colores de acento */
+        body.theme-light .bg-accent-cyan,
+        body.theme-light .text-accent-cyan {
+            /* Mantener colores originales */
+        }
     </style>
 </head>
 <body class="bg-dark-bg text-white">
@@ -740,6 +799,33 @@
                     </div>
                 </div>
 
+                <!-- Minimum Confidence -->
+                <div class="mb-6">
+                    <div class="bg-dark-bg rounded-lg p-4 border border-dark-border">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-md font-semibold text-white">Confianza Mínima</h4>
+                            <span class="material-symbols-outlined text-accent-cyan">verified</span>
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-sm block mb-2">
+                                Confianza mínima para abrir operaciones (0.0 - 1.0)
+                            </label>
+                            <input
+                                type="number"
+                                id="backtest-min-confidence"
+                                value="0.70"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                class="w-full bg-dark-card text-white rounded-lg px-4 py-2 border border-dark-border focus:border-accent-cyan focus:outline-none"
+                            />
+                            <p class="text-xs text-gray-500 mt-2">
+                                ℹ️ Valor recomendado: 0.70 (70% de confianza). Valores más altos = menos trades pero más precisos
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Strategy Management -->
                 <div class="mb-6 flex gap-3">
                     <div class="flex-1">
@@ -792,10 +878,16 @@
                 </div>
 
                 <!-- Equity Curve -->
-                <div class="mb-8">
-                    <h4 class="text-lg font-semibold mb-4">Curva de Capital</h4>
-                    <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg p-6" style="height: 250px;">
-                        <canvas id="equity-curve"></canvas>
+                <div id="equity-curve-container" class="mb-8 hidden">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-accent-cyan">show_chart</span>
+                        Curva de Capital
+                    </h4>
+                    <div class="bg-dark-bg rounded-lg border border-dark-border overflow-hidden">
+                        <div id="equity-curve-chart" style="height: 300px; width: 100%;"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500 text-center">
+                        📈 Balance inicial = Línea base | 📊 Línea azul = Evolución del capital
                     </div>
                 </div>
 
@@ -977,19 +1069,22 @@
                     <div class="mb-6">
                         <label class="text-gray-300 text-sm font-medium block mb-3">Tema</label>
                         <div class="grid grid-cols-3 gap-3">
-                            <button class="p-4 bg-dark-bg border-2 border-dark-border rounded-lg hover:border-accent-cyan transition text-center">
+                            <button id="theme-light" onclick="setTheme('light')" class="p-4 bg-dark-bg border-2 border-dark-border rounded-lg hover:border-accent-cyan transition text-center">
                                 <span class="material-symbols-outlined text-2xl mb-2">light_mode</span>
                                 <p class="text-sm">Claro</p>
                             </button>
-                            <button class="p-4 bg-dark-bg border-2 border-accent-cyan rounded-lg text-center">
+                            <button id="theme-dark" onclick="setTheme('dark')" class="p-4 bg-dark-bg border-2 border-accent-cyan rounded-lg text-center">
                                 <span class="material-symbols-outlined text-2xl mb-2">dark_mode</span>
                                 <p class="text-sm">Oscuro</p>
                             </button>
-                            <button class="p-4 bg-dark-bg border-2 border-dark-border rounded-lg hover:border-accent-cyan transition text-center">
+                            <button id="theme-system" onclick="setTheme('system')" class="p-4 bg-dark-bg border-2 border-dark-border rounded-lg hover:border-accent-cyan transition text-center">
                                 <span class="material-symbols-outlined text-2xl mb-2">computer</span>
                                 <p class="text-sm">Sistema</p>
                             </button>
                         </div>
+                        <p class="text-xs text-gray-500 mt-3">
+                            ℹ️ El tema se aplicará automáticamente y se guardará en tu navegador
+                        </p>
                     </div>
 
                     <button class="bg-accent-cyan hover:bg-cyan-600 text-white font-medium py-2 px-6 rounded-lg transition">
