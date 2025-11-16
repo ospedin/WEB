@@ -73,22 +73,137 @@ if %errorLevel% neq 0 (
 
 echo.
 echo ================================================================================
-echo Esperando que todos los servicios esten listos...
+echo    VERIFICANDO QUE TODOS LOS SERVICIOS ESTEN FUNCIONANDO...
 echo ================================================================================
 echo.
 
-:: Esperar 10 segundos para que los servicios inicien
-timeout /t 10 /nobreak >nul
+:: Verificar PostgreSQL (esperar hasta 60 segundos)
+echo [1/6] Verificando PostgreSQL...
+set /a count=0
+:check_postgres
+docker exec trading_postgres pg_isready -U trading_user -d trading_db >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - PostgreSQL esta listo
+    goto :check_redis
+)
+set /a count+=1
+if %count% geq 60 (
+    echo [ERROR] PostgreSQL no inicio correctamente
+    echo Mostrando logs de PostgreSQL:
+    docker-compose logs postgres
+    pause
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+goto :check_postgres
 
-:: Verificar estado de servicios
-echo Verificando servicios...
-echo.
+:check_redis
+echo [2/6] Verificando Redis...
+set /a count=0
+:check_redis_loop
+docker exec trading_redis redis-cli ping >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - Redis esta listo
+    goto :check_backend
+)
+set /a count+=1
+if %count% geq 30 (
+    echo [ERROR] Redis no inicio correctamente
+    echo Mostrando logs de Redis:
+    docker-compose logs redis
+    pause
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+goto :check_redis_loop
 
-docker-compose ps
+:check_backend
+echo [3/6] Verificando Backend (puede tardar 30-60 segundos)...
+set /a count=0
+:check_backend_loop
+curl -s http://localhost:8000/ >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - Backend esta listo y respondiendo
+    goto :check_frontend
+)
+set /a count+=1
+if %count% geq 90 (
+    echo [ERROR] Backend no inicio correctamente
+    echo.
+    echo Mostrando logs del backend:
+    docker-compose logs backend
+    echo.
+    echo Verifica que todas las dependencias estan instaladas en requirements.txt
+    pause
+    exit /b 1
+)
+if %count% equ 30 (
+    echo Aun esperando al backend... ^(30s^)
+)
+if %count% equ 60 (
+    echo Aun esperando al backend... ^(60s^)
+)
+timeout /t 1 /nobreak >nul
+goto :check_backend_loop
 
+:check_frontend
+echo [4/6] Verificando Frontend...
+set /a count=0
+:check_frontend_loop
+curl -s http://localhost:3000/ >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - Frontend esta listo
+    goto :check_grafana
+)
+set /a count+=1
+if %count% geq 30 (
+    echo [ERROR] Frontend no inicio correctamente
+    echo Mostrando logs de Frontend:
+    docker-compose logs frontend
+    pause
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+goto :check_frontend_loop
+
+:check_grafana
+echo [5/6] Verificando Grafana...
+set /a count=0
+:check_grafana_loop
+curl -s http://localhost:3001/ >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - Grafana esta listo
+    goto :check_prometheus
+)
+set /a count+=1
+if %count% geq 30 (
+    echo [ADVERTENCIA] Grafana no responde, pero no es critico
+    goto :check_prometheus
+)
+timeout /t 1 /nobreak >nul
+goto :check_grafana_loop
+
+:check_prometheus
+echo [6/6] Verificando Prometheus...
+set /a count=0
+:check_prometheus_loop
+curl -s http://localhost:9090/ >nul 2>&1
+if %errorLevel% equ 0 (
+    echo OK - Prometheus esta listo
+    goto :all_ready
+)
+set /a count+=1
+if %count% geq 30 (
+    echo [ADVERTENCIA] Prometheus no responde, pero no es critico
+    goto :all_ready
+)
+timeout /t 1 /nobreak >nul
+goto :check_prometheus_loop
+
+:all_ready
 echo.
 echo ================================================================================
-echo    SERVICIOS INICIADOS CORRECTAMENTE
+echo    TODOS LOS SERVICIOS ESTAN FUNCIONANDO CORRECTAMENTE
 echo ================================================================================
 echo.
 echo SERVICIOS DISPONIBLES:

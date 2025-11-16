@@ -49,6 +49,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - PYTHONUNBUFFERED=1
       - ML_MODEL_PATH=/app/models/ppo_trading_model.zip
+      - TOPSTEP_API_KEY=${TOPSTEP_API_KEY:-}
+      - TOPSTEP_USERNAME=${TOPSTEP_USERNAME:-}
     volumes:
       - ./backend:/app
       - model_data:/app/models
@@ -58,6 +60,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # Frontend Nginx
