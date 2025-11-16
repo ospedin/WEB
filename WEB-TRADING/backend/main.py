@@ -170,11 +170,6 @@ class BacktestRequest(BaseModel):
     # Parámetros de riesgo del usuario
     stop_loss_usd: Optional[float] = 150.0
     take_profit_ratio: Optional[float] = 2.0
-    # Parámetros de indicadores
-    smi_oversold: Optional[float] = -40.0
-    smi_overbought: Optional[float] = 40.0
-    stoch_rsi_oversold: Optional[float] = 20.0
-    stoch_rsi_overbought: Optional[float] = 80.0
     # Indicadores seleccionados por el usuario
     use_smi: Optional[bool] = False
     use_macd: Optional[bool] = False
@@ -184,10 +179,41 @@ class BacktestRequest(BaseModel):
     use_vwap: Optional[bool] = False
     use_supertrend: Optional[bool] = False
     use_kdj: Optional[bool] = False
-    use_cci: Optional[bool] = False
-    use_roc: Optional[bool] = False
-    use_atr: Optional[bool] = False
-    use_wr: Optional[bool] = False
+    # Parámetros SMI
+    smi_k_length: Optional[int] = 8
+    smi_d_smoothing: Optional[int] = 3
+    smi_signal_period: Optional[int] = 3
+    smi_oversold: Optional[float] = -40.0
+    smi_overbought: Optional[float] = 40.0
+    # Parámetros MACD
+    macd_fast_period: Optional[int] = 12
+    macd_slow_period: Optional[int] = 26
+    macd_signal_period: Optional[int] = 9
+    # Parámetros Bollinger Bands
+    bb_period: Optional[int] = 20
+    bb_std_dev: Optional[float] = 2.0
+    # Parámetros Moving Averages
+    ma_sma_fast: Optional[int] = 20
+    ma_sma_slow: Optional[int] = 50
+    ma_ema_fast: Optional[int] = 12
+    ma_ema_slow: Optional[int] = 26
+    # Parámetros StochRSI
+    stoch_rsi_period: Optional[int] = 14
+    stoch_rsi_stoch_period: Optional[int] = 14
+    stoch_rsi_k_smooth: Optional[int] = 3
+    stoch_rsi_d_smooth: Optional[int] = 3
+    stoch_rsi_oversold: Optional[float] = 20.0
+    stoch_rsi_overbought: Optional[float] = 80.0
+    # Parámetros VWAP
+    vwap_std_dev: Optional[float] = 2.0
+    # Parámetros SuperTrend
+    supertrend_period: Optional[int] = 10
+    supertrend_multiplier: Optional[float] = 3.0
+    # Parámetros KDJ
+    kdj_period: Optional[int] = 9
+    kdj_k_smooth: Optional[int] = 3
+    kdj_d_smooth: Optional[int] = 3
+    # Confianza mínima
     min_confidence: Optional[float] = 0.70
 
 class ContractBotConfigRequest(BaseModel):
@@ -1370,10 +1396,41 @@ async def run_backtest(request: BacktestRequest, background_tasks: BackgroundTas
                 existing_config.use_vwap = request.use_vwap
                 existing_config.use_supertrend = request.use_supertrend
                 existing_config.use_kdj = request.use_kdj
+                # Parámetros SMI
+                existing_config.smi_k_length = request.smi_k_length
+                existing_config.smi_d_smoothing = request.smi_d_smoothing
+                existing_config.smi_signal_period = request.smi_signal_period
                 existing_config.smi_oversold = request.smi_oversold
                 existing_config.smi_overbought = request.smi_overbought
+                # Parámetros MACD
+                existing_config.macd_fast_period = request.macd_fast_period
+                existing_config.macd_slow_period = request.macd_slow_period
+                existing_config.macd_signal_period = request.macd_signal_period
+                # Parámetros Bollinger Bands
+                existing_config.bb_period = request.bb_period
+                existing_config.bb_std_dev = request.bb_std_dev
+                # Parámetros Moving Averages
+                existing_config.ma_sma_fast = request.ma_sma_fast
+                existing_config.ma_sma_slow = request.ma_sma_slow
+                existing_config.ma_ema_fast = request.ma_ema_fast
+                existing_config.ma_ema_slow = request.ma_ema_slow
+                # Parámetros StochRSI
+                existing_config.stoch_rsi_period = request.stoch_rsi_period
+                existing_config.stoch_rsi_stoch_period = request.stoch_rsi_stoch_period
+                existing_config.stoch_rsi_k_smooth = request.stoch_rsi_k_smooth
+                existing_config.stoch_rsi_d_smooth = request.stoch_rsi_d_smooth
                 existing_config.stoch_rsi_oversold = request.stoch_rsi_oversold
                 existing_config.stoch_rsi_overbought = request.stoch_rsi_overbought
+                # Parámetros VWAP
+                existing_config.vwap_std_dev = request.vwap_std_dev
+                # Parámetros SuperTrend
+                existing_config.supertrend_period = request.supertrend_period
+                existing_config.supertrend_multiplier = request.supertrend_multiplier
+                # Parámetros KDJ
+                existing_config.kdj_period = request.kdj_period
+                existing_config.kdj_k_smooth = request.kdj_k_smooth
+                existing_config.kdj_d_smooth = request.kdj_d_smooth
+                # Configuración general
                 existing_config.min_confidence = request.min_confidence
                 existing_config.timeframe_minutes = request.timeframes[0]
                 db.commit()
@@ -1402,30 +1459,39 @@ async def run_backtest(request: BacktestRequest, background_tasks: BackgroundTas
                     use_supertrend=request.use_supertrend,
                     use_kdj=request.use_kdj,
                     # Parámetros SMI
-                    smi_k_length=8,
-                    smi_d_smoothing=3,
-                    smi_signal_period=3,
+                    smi_k_length=request.smi_k_length,
+                    smi_d_smoothing=request.smi_d_smoothing,
+                    smi_signal_period=request.smi_signal_period,
                     smi_oversold=request.smi_oversold,
                     smi_overbought=request.smi_overbought,
                     # Parámetros MACD
-                    macd_fast_period=12,
-                    macd_slow_period=26,
-                    macd_signal_period=9,
+                    macd_fast_period=request.macd_fast_period,
+                    macd_slow_period=request.macd_slow_period,
+                    macd_signal_period=request.macd_signal_period,
                     # Parámetros Bollinger Bands
-                    bb_period=20,
-                    bb_std_dev=2.0,
+                    bb_period=request.bb_period,
+                    bb_std_dev=request.bb_std_dev,
                     # Parámetros Moving Averages
-                    ma_sma_fast=20,
-                    ma_sma_slow=50,
-                    ma_ema_fast=12,
-                    ma_ema_slow=26,
+                    ma_sma_fast=request.ma_sma_fast,
+                    ma_sma_slow=request.ma_sma_slow,
+                    ma_ema_fast=request.ma_ema_fast,
+                    ma_ema_slow=request.ma_ema_slow,
                     # Parámetros StochRSI
-                    stoch_rsi_period=14,
-                    stoch_rsi_stoch_period=14,
-                    stoch_rsi_k_smooth=3,
-                    stoch_rsi_d_smooth=3,
+                    stoch_rsi_period=request.stoch_rsi_period,
+                    stoch_rsi_stoch_period=request.stoch_rsi_stoch_period,
+                    stoch_rsi_k_smooth=request.stoch_rsi_k_smooth,
+                    stoch_rsi_d_smooth=request.stoch_rsi_d_smooth,
                     stoch_rsi_oversold=request.stoch_rsi_oversold,
                     stoch_rsi_overbought=request.stoch_rsi_overbought,
+                    # Parámetros VWAP
+                    vwap_std_dev=request.vwap_std_dev,
+                    # Parámetros SuperTrend
+                    supertrend_period=request.supertrend_period,
+                    supertrend_multiplier=request.supertrend_multiplier,
+                    # Parámetros KDJ
+                    kdj_period=request.kdj_period,
+                    kdj_k_smooth=request.kdj_k_smooth,
+                    kdj_d_smooth=request.kdj_d_smooth,
                     # Configuración general
                     timeframe_minutes=request.timeframes[0],
                     min_confidence=request.min_confidence

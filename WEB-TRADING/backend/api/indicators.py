@@ -460,11 +460,40 @@ class TechnicalIndicators:
                        use_vwap: bool = False,
                        use_supertrend: bool = False,
                        use_kdj: bool = False,
-                       # Parámetros de sobreventa/sobrecompra
+                       # Parámetros SMI
+                       smi_k_length: int = 8,
+                       smi_d_smoothing: int = 3,
+                       smi_signal_period: int = 3,
                        smi_oversold: float = -40.0,
                        smi_overbought: float = 40.0,
+                       # Parámetros MACD
+                       macd_fast_period: int = 12,
+                       macd_slow_period: int = 26,
+                       macd_signal_period: int = 9,
+                       # Parámetros Bollinger Bands
+                       bb_period: int = 20,
+                       bb_std_dev: float = 2.0,
+                       # Parámetros Moving Averages
+                       ma_sma_fast: int = 20,
+                       ma_sma_slow: int = 50,
+                       ma_ema_fast: int = 12,
+                       ma_ema_slow: int = 26,
+                       # Parámetros StochRSI
+                       stoch_rsi_period: int = 14,
+                       stoch_rsi_stoch_period: int = 14,
+                       stoch_rsi_k_smooth: int = 3,
+                       stoch_rsi_d_smooth: int = 3,
                        stoch_rsi_oversold: float = 20.0,
-                       stoch_rsi_overbought: float = 80.0) -> Dict:
+                       stoch_rsi_overbought: float = 80.0,
+                       # Parámetros VWAP
+                       vwap_std_dev: float = 2.0,
+                       # Parámetros SuperTrend
+                       supertrend_period: int = 10,
+                       supertrend_multiplier: float = 3.0,
+                       # Parámetros KDJ
+                       kdj_period: int = 9,
+                       kdj_k_smooth: int = 3,
+                       kdj_d_smooth: int = 3) -> Dict:
         """
         Genera señal de trading combinando múltiples indicadores
         """
@@ -483,7 +512,12 @@ class TechnicalIndicators:
 
         # SMI - Niveles configurables de sobreventa/sobrecompra
         if use_smi:
-            smi_result = TechnicalIndicators.calculate_smi(bars)
+            smi_result = TechnicalIndicators.calculate_smi(
+                bars,
+                k_length=smi_k_length,
+                d_smoothing=smi_d_smoothing,
+                signal_period=smi_signal_period
+            )
             current_smi = smi_result.smi[-1]
             current_signal = smi_result.signal[-1]
             prev_smi = smi_result.smi[-2]
@@ -509,7 +543,12 @@ class TechnicalIndicators:
 
         # MACD
         if use_macd:
-            macd_result = TechnicalIndicators.calculate_macd(bars)
+            macd_result = TechnicalIndicators.calculate_macd(
+                bars,
+                fast_period=macd_fast_period,
+                slow_period=macd_slow_period,
+                signal_period=macd_signal_period
+            )
             current_macd = macd_result.macd[-1]
             current_macd_signal = macd_result.signal[-1]
             prev_macd = macd_result.macd[-2]
@@ -533,7 +572,11 @@ class TechnicalIndicators:
 
         # Bollinger Bands - Detectar cruces y reversiones
         if use_bb:
-            bb_result = TechnicalIndicators.calculate_bollinger_bands(bars)
+            bb_result = TechnicalIndicators.calculate_bollinger_bands(
+                bars,
+                period=bb_period,
+                std_dev=bb_std_dev
+            )
             current_price = bars[-1].close
             prev_price = bars[-2].close
             upper = bb_result.upper[-1]
@@ -572,7 +615,13 @@ class TechnicalIndicators:
 
         # Moving Averages
         if use_ma:
-            ma_result = TechnicalIndicators.calculate_moving_averages(bars)
+            ma_result = TechnicalIndicators.calculate_moving_averages(
+                bars,
+                sma_fast=ma_sma_fast,
+                sma_slow=ma_sma_slow,
+                ema_fast=ma_ema_fast,
+                ema_slow=ma_ema_slow
+            )
             sma_fast = ma_result.sma_fast[-1]
             sma_slow = ma_result.sma_slow[-1]
             prev_sma_fast = ma_result.sma_fast[-2]
@@ -596,7 +645,13 @@ class TechnicalIndicators:
 
         # StochRSI - Niveles configurables de sobreventa/sobrecompra
         if use_stoch_rsi:
-            stoch_rsi_result = TechnicalIndicators.calculate_stoch_rsi(bars)
+            stoch_rsi_result = TechnicalIndicators.calculate_stoch_rsi(
+                bars,
+                rsi_period=stoch_rsi_period,
+                stoch_period=stoch_rsi_stoch_period,
+                k_smooth=stoch_rsi_k_smooth,
+                d_smooth=stoch_rsi_d_smooth
+            )
             k_value = stoch_rsi_result.k[-1]
             d_value = stoch_rsi_result.d[-1]
             prev_k = stoch_rsi_result.k[-2]
@@ -623,7 +678,7 @@ class TechnicalIndicators:
 
         # VWAP
         if use_vwap:
-            vwap_result = TechnicalIndicators.calculate_vwap(bars)
+            vwap_result = TechnicalIndicators.calculate_vwap(bars, std_dev=vwap_std_dev)
             current_price = bars[-1].close
             vwap_value = vwap_result.vwap[-1]
             upper_band = vwap_result.upper_band[-1]
@@ -655,7 +710,11 @@ class TechnicalIndicators:
 
         # SuperTrend
         if use_supertrend:
-            supertrend_result = TechnicalIndicators.calculate_supertrend(bars)
+            supertrend_result = TechnicalIndicators.calculate_supertrend(
+                bars,
+                period=supertrend_period,
+                multiplier=supertrend_multiplier
+            )
             current_direction = supertrend_result.direction[-1]
             prev_direction = supertrend_result.direction[-2]
             supertrend_value = supertrend_result.supertrend[-1]
@@ -686,7 +745,12 @@ class TechnicalIndicators:
 
         # KDJ
         if use_kdj:
-            kdj_result = TechnicalIndicators.calculate_kdj(bars)
+            kdj_result = TechnicalIndicators.calculate_kdj(
+                bars,
+                period=kdj_period,
+                k_smooth=kdj_k_smooth,
+                d_smooth=kdj_d_smooth
+            )
             k_value = kdj_result.k[-1]
             d_value = kdj_result.d[-1]
             j_value = kdj_result.j[-1]

@@ -426,20 +426,45 @@ async function toggleBot() {
 }
 
 async function saveBotConfig() {
+    // LEER VALORES DE LA UI - NUNCA USAR VALORES HARDCODEADOS
+    const stopLoss = parseFloat(document.getElementById('bot-stop-loss')?.value) || 150.0;
+    const takeProfit = parseFloat(document.getElementById('bot-take-profit')?.value) || 300.0;
+    const takeProfitRatio = stopLoss > 0 ? takeProfit / stopLoss : 2.0;
+    const maxPositions = parseInt(document.getElementById('bot-max-positions')?.value) || 8;
+    const maxDailyLoss = parseFloat(document.getElementById('bot-max-daily-loss')?.value) || 600.0;
+    const maxDailyTrades = parseInt(document.getElementById('bot-max-daily-trades')?.value) || 50;
+    const timeframe = parseInt(document.getElementById('bot-timeframe')?.value) || 5;
+    const minConfidence = parseFloat(document.getElementById('bot-min-confidence')?.value) || 0.70;
+    const cooldown = parseInt(document.getElementById('bot-cooldown')?.value) || 45;
+
+    // Indicadores seleccionados - leer de la UI
+    const useSmi = document.getElementById('bot-use-smi')?.checked || false;
+    const useMacd = document.getElementById('bot-use-macd')?.checked || false;
+    const useBb = document.getElementById('bot-use-bb')?.checked || false;
+    const useMa = document.getElementById('bot-use-ma')?.checked || false;
+    const useStochRsi = document.getElementById('bot-use-stochrsi')?.checked || false;
+    const useVwap = document.getElementById('bot-use-vwap')?.checked || false;
+    const useSupertrend = document.getElementById('bot-use-supertrend')?.checked || false;
+    const useKdj = document.getElementById('bot-use-kdj')?.checked || false;
+
     const config = {
         name: "Bot Configuration",
-        stop_loss_usd: 150.0,
-        take_profit_ratio: 2.5,
-        max_positions: 8,
-        max_daily_loss: 600.0,
-        max_daily_trades: 50,
-        use_smi: true,
-        use_macd: true,
-        use_bb: true,
-        use_ma: true,
-        timeframe_minutes: 5,
-        min_confidence: 0.70,
-        cooldown_seconds: 45
+        stop_loss_usd: stopLoss,
+        take_profit_ratio: takeProfitRatio,
+        max_positions: maxPositions,
+        max_daily_loss: maxDailyLoss,
+        max_daily_trades: maxDailyTrades,
+        use_smi: useSmi,
+        use_macd: useMacd,
+        use_bb: useBb,
+        use_ma: useMa,
+        use_stoch_rsi: useStochRsi,
+        use_vwap: useVwap,
+        use_supertrend: useSupertrend,
+        use_kdj: useKdj,
+        timeframe_minutes: timeframe,
+        min_confidence: minConfidence,
+        cooldown_seconds: cooldown
     };
 
     try {
@@ -452,14 +477,38 @@ async function saveBotConfig() {
         const data = await response.json();
 
         if (data.success) {
-            alert('✅ Configuración guardada exitosamente');
+            if (window.errorNotificationSystem) {
+                window.errorNotificationSystem.notify(
+                    '✅ Configuración guardada',
+                    'La configuración del bot se guardó correctamente',
+                    'success'
+                );
+            } else {
+                alert('✅ Configuración guardada exitosamente');
+            }
         } else {
-            alert('❌ Error: ' + data.message);
+            if (window.errorNotificationSystem) {
+                window.errorNotificationSystem.notify(
+                    '❌ Error',
+                    data.message || 'No se pudo guardar la configuración',
+                    'error'
+                );
+            } else {
+                alert('❌ Error: ' + data.message);
+            }
         }
 
     } catch (error) {
         console.error('Error guardando configuración:', error);
-        alert('❌ Error guardando configuración');
+        if (window.errorNotificationSystem) {
+            window.errorNotificationSystem.notify(
+                '❌ Error',
+                'Error de conexión al guardar la configuración',
+                'error'
+            );
+        } else {
+            alert('❌ Error guardando configuración');
+        }
     }
 }
 
@@ -1049,13 +1098,6 @@ async function executeBacktest() {
     // Calcular take profit ratio
     const takeProfitRatio = stopLoss > 0 ? takeProfit / stopLoss : 2.0;
 
-    // Obtener parámetros de sobreventa/sobrecompra
-    const smiOversold = parseFloat(document.getElementById('smi-oversold')?.value) || -40;
-    const smiOverbought = parseFloat(document.getElementById('smi-overbought')?.value) || 40;
-    const stochRsiOversold = parseFloat(document.getElementById('stochrsi-oversold')?.value) || 20;
-    const stochRsiOverbought = parseFloat(document.getElementById('stochrsi-overbought')?.value) || 80;
-    const minConfidence = parseFloat(document.getElementById('backtest-min-confidence')?.value) || 0.70;
-
     // Obtener indicadores seleccionados
     const useSmi = document.getElementById('use-smi')?.checked || false;
     const useMacd = document.getElementById('use-macd')?.checked || false;
@@ -1065,10 +1107,6 @@ async function executeBacktest() {
     const useVwap = document.getElementById('use-vwap')?.checked || false;
     const useSupertrend = document.getElementById('use-supertrend')?.checked || false;
     const useKdj = document.getElementById('use-kdj')?.checked || false;
-    const useCci = document.getElementById('use-cci')?.checked || false;
-    const useRoc = document.getElementById('use-roc')?.checked || false;
-    const useAtr = document.getElementById('use-atr')?.checked || false;
-    const useWr = document.getElementById('use-wr')?.checked || false;
 
     // Verificar que al menos un indicador esté seleccionado si no es modo "model"
     const hasAnyIndicator = useSmi || useMacd || useBb || useMa || useStochRsi || useVwap || useSupertrend || useKdj;
@@ -1083,6 +1121,49 @@ async function executeBacktest() {
         return;
     }
 
+    // Obtener TODOS los parámetros personalizados de los indicadores
+    const minConfidence = parseFloat(document.getElementById('backtest-min-confidence')?.value) || 0.70;
+
+    // Parámetros SMI
+    const smiKLength = parseInt(document.getElementById('smi-k-period')?.value) || 8;
+    const smiDSmoothing = parseInt(document.getElementById('smi-d-period')?.value) || 3;
+    const smiSignalPeriod = parseInt(document.getElementById('smi-smooth')?.value) || 3;
+    const smiOversold = parseFloat(document.getElementById('smi-oversold')?.value) || -40;
+    const smiOverbought = parseFloat(document.getElementById('smi-overbought')?.value) || 40;
+
+    // Parámetros MACD
+    const macdFastPeriod = parseInt(document.getElementById('macd-fast')?.value) || 12;
+    const macdSlowPeriod = parseInt(document.getElementById('macd-slow')?.value) || 26;
+    const macdSignalPeriod = parseInt(document.getElementById('macd-signal')?.value) || 9;
+
+    // Parámetros Bollinger Bands
+    const bbPeriod = parseInt(document.getElementById('bb-period')?.value) || 20;
+    const bbStdDev = parseFloat(document.getElementById('bb-std-dev')?.value) || 2.0;
+
+    // Parámetros Moving Averages
+    const maSmaFast = parseInt(document.getElementById('ma-fast')?.value) || 20;
+    const maSmaFlow = parseInt(document.getElementById('ma-slow')?.value) || 50;
+
+    // Parámetros StochRSI
+    const stochRsiPeriod = parseInt(document.getElementById('stochrsi-rsi-period')?.value) || 14;
+    const stochRsiStochPeriod = parseInt(document.getElementById('stochrsi-stoch-period')?.value) || 14;
+    const stochRsiKSmooth = parseInt(document.getElementById('stochrsi-k')?.value) || 3;
+    const stochRsiDSmooth = parseInt(document.getElementById('stochrsi-d')?.value) || 3;
+    const stochRsiOversold = parseFloat(document.getElementById('stochrsi-oversold')?.value) || 20;
+    const stochRsiOverbought = parseFloat(document.getElementById('stochrsi-overbought')?.value) || 80;
+
+    // Parámetros VWAP
+    const vwapStdDev = 2.0; // VWAP no tiene input en UI, usar default
+
+    // Parámetros SuperTrend
+    const supertrendPeriod = 10; // SuperTrend no tiene input en UI, usar default
+    const supertrendMultiplier = 3.0;
+
+    // Parámetros KDJ
+    const kdjPeriod = parseInt(document.getElementById('kdj-k-period')?.value) || 9;
+    const kdjKSmooth = parseInt(document.getElementById('kdj-d-period')?.value) || 3;
+    const kdjDSmooth = parseInt(document.getElementById('kdj-j-period')?.value) || 3;
+
     // Configuración del backtest según el backend requiere
     const backtestConfig = {
         contract_id: selectedBacktestContract.id,
@@ -1092,11 +1173,6 @@ async function executeBacktest() {
         end_date: new Date(endDate).toISOString(),
         stop_loss_usd: stopLoss,
         take_profit_ratio: takeProfitRatio,
-        // Parámetros de indicadores
-        smi_oversold: smiOversold,
-        smi_overbought: smiOverbought,
-        stoch_rsi_oversold: stochRsiOversold,
-        stoch_rsi_overbought: stochRsiOverbought,
         min_confidence: minConfidence,
         // Indicadores seleccionados
         use_smi: useSmi,
@@ -1107,10 +1183,40 @@ async function executeBacktest() {
         use_vwap: useVwap,
         use_supertrend: useSupertrend,
         use_kdj: useKdj,
-        use_cci: useCci,
-        use_roc: useRoc,
-        use_atr: useAtr,
-        use_wr: useWr
+        // Parámetros SMI
+        smi_k_length: smiKLength,
+        smi_d_smoothing: smiDSmoothing,
+        smi_signal_period: smiSignalPeriod,
+        smi_oversold: smiOversold,
+        smi_overbought: smiOverbought,
+        // Parámetros MACD
+        macd_fast_period: macdFastPeriod,
+        macd_slow_period: macdSlowPeriod,
+        macd_signal_period: macdSignalPeriod,
+        // Parámetros Bollinger Bands
+        bb_period: bbPeriod,
+        bb_std_dev: bbStdDev,
+        // Parámetros Moving Averages
+        ma_sma_fast: maSmaFast,
+        ma_sma_slow: maSmaFlow,
+        ma_ema_fast: 12,  // EMA no tiene inputs en UI, usar defaults
+        ma_ema_slow: 26,
+        // Parámetros StochRSI
+        stoch_rsi_period: stochRsiPeriod,
+        stoch_rsi_stoch_period: stochRsiStochPeriod,
+        stoch_rsi_k_smooth: stochRsiKSmooth,
+        stoch_rsi_d_smooth: stochRsiDSmooth,
+        stoch_rsi_oversold: stochRsiOversold,
+        stoch_rsi_overbought: stochRsiOverbought,
+        // Parámetros VWAP
+        vwap_std_dev: vwapStdDev,
+        // Parámetros SuperTrend
+        supertrend_period: supertrendPeriod,
+        supertrend_multiplier: supertrendMultiplier,
+        // Parámetros KDJ
+        kdj_period: kdjPeriod,
+        kdj_k_smooth: kdjKSmooth,
+        kdj_d_smooth: kdjDSmooth
     }
 
     try {

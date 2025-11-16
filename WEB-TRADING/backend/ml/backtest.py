@@ -66,7 +66,10 @@ class BacktestEngine:
         # Estado del backtest
         self.positions: List[Dict] = []
         self.trades: List[Dict] = []
-        self.initial_balance = 100000.0  # Balance inicial
+        # Usar balance inicial de la configuración del bot si está disponible, sino usar valor razonable
+        self.initial_balance = 100000.0  # Balance inicial por defecto
+        if self.bot_config and hasattr(self.bot_config, 'initial_balance'):
+            self.initial_balance = self.bot_config.initial_balance
         self.balance = self.initial_balance
         self.peak_balance = self.balance
         self.max_drawdown = 0.0
@@ -255,11 +258,40 @@ class BacktestEngine:
                 use_vwap=self.indicator_config.use_vwap,
                 use_supertrend=self.indicator_config.use_supertrend,
                 use_kdj=self.indicator_config.use_kdj,
-                # Parámetros de sobreventa/sobrecompra
+                # Parámetros SMI
+                smi_k_length=self.indicator_config.smi_k_length,
+                smi_d_smoothing=self.indicator_config.smi_d_smoothing,
+                smi_signal_period=self.indicator_config.smi_signal_period,
                 smi_oversold=self.indicator_config.smi_oversold,
                 smi_overbought=self.indicator_config.smi_overbought,
+                # Parámetros MACD
+                macd_fast_period=self.indicator_config.macd_fast_period,
+                macd_slow_period=self.indicator_config.macd_slow_period,
+                macd_signal_period=self.indicator_config.macd_signal_period,
+                # Parámetros Bollinger Bands
+                bb_period=self.indicator_config.bb_period,
+                bb_std_dev=self.indicator_config.bb_std_dev,
+                # Parámetros Moving Averages
+                ma_sma_fast=self.indicator_config.ma_sma_fast,
+                ma_sma_slow=self.indicator_config.ma_sma_slow,
+                ma_ema_fast=self.indicator_config.ma_ema_fast,
+                ma_ema_slow=self.indicator_config.ma_ema_slow,
+                # Parámetros StochRSI
+                stoch_rsi_period=self.indicator_config.stoch_rsi_period,
+                stoch_rsi_stoch_period=self.indicator_config.stoch_rsi_stoch_period,
+                stoch_rsi_k_smooth=self.indicator_config.stoch_rsi_k_smooth,
+                stoch_rsi_d_smooth=self.indicator_config.stoch_rsi_d_smooth,
                 stoch_rsi_oversold=self.indicator_config.stoch_rsi_oversold,
-                stoch_rsi_overbought=self.indicator_config.stoch_rsi_overbought
+                stoch_rsi_overbought=self.indicator_config.stoch_rsi_overbought,
+                # Parámetros VWAP
+                vwap_std_dev=self.indicator_config.vwap_std_dev,
+                # Parámetros SuperTrend
+                supertrend_period=self.indicator_config.supertrend_period,
+                supertrend_multiplier=self.indicator_config.supertrend_multiplier,
+                # Parámetros KDJ
+                kdj_period=self.indicator_config.kdj_period,
+                kdj_k_smooth=self.indicator_config.kdj_k_smooth,
+                kdj_d_smooth=self.indicator_config.kdj_d_smooth
             )
 
             return {
@@ -328,9 +360,14 @@ class BacktestEngine:
         # Calcular stop loss y take profit usando configuración del usuario
         sl_multiplier = signal.get('sl_multiplier', 1.0)
 
-        # Usar valores de la configuración del bot (que vienen del usuario)
-        stop_loss_usd = (self.bot_config.stop_loss_usd if self.bot_config else 150) * sl_multiplier
-        tp_ratio = self.bot_config.take_profit_ratio if self.bot_config else 2.0
+        # Usar valores de la configuración del bot (que SIEMPRE deben venir del usuario)
+        # Si no hay bot_config, es un error de configuración
+        if not self.bot_config:
+            logger.error("❌ No hay configuración de bot - no se puede abrir posición")
+            return
+
+        stop_loss_usd = self.bot_config.stop_loss_usd * sl_multiplier
+        tp_ratio = self.bot_config.take_profit_ratio
         tp_multiplier = signal.get('tp_multiplier', tp_ratio)
 
         ticks_sl = stop_loss_usd / self.contract.tick_value
@@ -472,12 +509,16 @@ class BacktestEngine:
             self._check_position_exits(current_bar)
 
             # Abrir nueva posición si hay señal
-            # Usar min_confidence de indicator_config si existe, sino de bot_config, sino valor por defecto
-            min_confidence = 0.70  # Valor por defecto
+            # Usar min_confidence del usuario - NUNCA usar valores por defecto hardcodeados
+            min_confidence = None
             if self.indicator_config and hasattr(self.indicator_config, 'min_confidence'):
                 min_confidence = self.indicator_config.min_confidence
             elif self.bot_config and hasattr(self.bot_config, 'min_confidence'):
                 min_confidence = self.bot_config.min_confidence
+
+            if min_confidence is None:
+                logger.error("❌ No hay min_confidence configurado - usando 0.70 como último recurso")
+                min_confidence = 0.70
 
             if signal['confidence'] >= min_confidence:
                 self._open_position(signal, current_bar)
